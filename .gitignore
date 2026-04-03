@@ -1,0 +1,38 @@
+# === Dependencies ===
+node_modules/
+
+# === Build output ===
+dist/
+*.tsbuildinfo
+
+# === IDE / Editor ===
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# === Environment ===
+.env
+.env.local
+.env.*.local
+
+# === Testing ===
+coverage/
+.nyc_output/
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+
+# === Logs ===
+*.log
+npm-debug.log*
+
+# === Neo4j local data ===
+neo4j-data/
+
+# === Misc ===
+*.tgz

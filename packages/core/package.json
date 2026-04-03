@@ -1,0 +1,27 @@
+{
+  "name": "@codegraph/core",
+  "version": "0.1.0",
+  "description": "Core engine for CodeGraph — parsers, graph, AI agents, scenario & correction engines",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest watch --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "ts-morph": "^21.0.1",
+    "neo4j-driver": "^5.17.0",
+    "openai": "^4.28.0",
+    "yaml": "^2.3.4",
+    "glob": "^10.3.10",
+    "winston": "^3.11.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "vitest": "^1.2.0",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

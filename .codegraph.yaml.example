@@ -1,0 +1,123 @@
+# =============================================================================
+# CodeGraph Configuration — Example
+# =============================================================================
+#
+# Copy this file to `.codegraph.yaml` in your project root and customize.
+#
+# Run `codegraph init` to generate a starter config interactively, or
+# copy this file and edit it manually.
+#
+# Environment variable substitution is supported: ${VAR_NAME}
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Project settings
+# ---------------------------------------------------------------------------
+project:
+  # Display name for this project (used in the web UI header)
+  name: "my-project"
+
+  # Languages to parse. Supported: "ts", "tsx", "js", "jsx", "cpp", "c"
+  languages:
+    - "ts"
+
+  # Directories to index (relative to project root)
+  rootDirs:
+    - "src"
+
+  # Directories to exclude from indexing
+  excludeDirs:
+    - "node_modules"
+    - "dist"
+    - ".git"
+    - "coverage"
+    - "__tests__"
+
+# ---------------------------------------------------------------------------
+# Neo4j connection
+# ---------------------------------------------------------------------------
+neo4j:
+  # Bolt protocol URI
+  uri: "bolt://localhost:7687"
+
+  # Authentication
+  username: "neo4j"
+  password: "${CODEGRAPH_NEO4J_PASSWORD}"   # use env var for security
+
+  # Neo4j database name (default: "neo4j")
+  database: "neo4j"
+
+# ---------------------------------------------------------------------------
+# Parser settings
+# ---------------------------------------------------------------------------
+parser:
+  # TypeScript / JavaScript parser (ts-morph)
+  typescript:
+    # Path to tsconfig.json (relative to project root)
+    tsconfig: "tsconfig.json"
+
+  # C/C++ parser (clangd + libclang) — uncomment for C++ projects
+  # cpp:
+  #   # Path to compile_commands.json (required for C++ indexing)
+  #   compileCommands: "out/Default/compile_commands.json"
+  #
+  #   # Path to clangd binary
+  #   clangdPath: "/usr/bin/clangd"
+
+# ---------------------------------------------------------------------------
+# AI settings
+# ---------------------------------------------------------------------------
+ai:
+  # AI provider: "openai" or "mock" (mock requires no API key)
+  provider: "openai"
+
+  # Model to use for AI operations
+  model: "gpt-4-turbo"
+
+  # API key (use env var — never commit keys to source control)
+  apiKey: "${CODEGRAPH_AI_API_KEY}"
+
+  # Maximum tokens per AI request (model-dependent)
+  maxTokensPerRequest: 120000
+
+  # Temperature: lower = more deterministic, higher = more creative
+  # Recommended: 0.1–0.3 for code analysis
+  temperature: 0.2
+
+# ---------------------------------------------------------------------------
+# Tracing settings
+# ---------------------------------------------------------------------------
+tracing:
+  # Maximum call depth to trace (prevents infinite recursion)
+  maxDepth: 50
+
+  # Maximum steps (lines) to trace within a single function
+  maxStepsPerFunction: 200
+
+  # Functions to skip during tracing (glob patterns)
+  # These are auto-summarized without stepping into
+  boringFunctions:
+    - "console.*"
+    # C++ examples:
+    # - "LOG*"
+    # - "DCHECK*"
+    # - "base::*Ref*"
+
+  # Namespaces to skip entirely
+  boringNamespaces: []
+    # C++ examples:
+    # - "base::internal"
+    # - "testing"
+
+  # Functions to always trace, even if they exceed maxDepth
+  focusFunctions: []
+
+# ---------------------------------------------------------------------------
+# Server settings
+# ---------------------------------------------------------------------------
+server:
+  # Port for the API server and web UI
+  port: 3000
+
+  # Host to bind to ("127.0.0.1" for local only, "0.0.0.0" for all interfaces)
+  host: "127.0.0.1"

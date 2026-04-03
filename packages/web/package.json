@@ -1,0 +1,29 @@
+{
+  "name": "@codegraph/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web UI for CodeGraph",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "cytoscape": "^3.28.1",
+    "zustand": "^4.5.0",
+    "@apollo/client": "^3.9.0",
+    "graphql": "^16.8.1",
+    "react-router-dom": "^6.22.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@types/cytoscape": "^3.21.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12"
+  }
+}
