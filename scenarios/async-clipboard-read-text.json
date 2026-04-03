@@ -1,0 +1,272 @@
+{
+  "id": "async-clipboard-read-text",
+  "name": "Async Clipboard readText() API Call",
+  "description": "Traces the full execution path when a web page calls navigator.clipboard.readText() in Chromium. The flow spans from the JavaScript API in the renderer process, through Mojo IPC, to the browser process clipboard host, and finally to the platform-specific OS clipboard implementation.",
+  "discoveredBy": "human",
+  "confidence": 0.95,
+  "status": "traced",
+  "entryFunction": "Clipboard::readText",
+  "triggerCondition": "A web page running in a secure context (HTTPS) calls navigator.clipboard.readText(). The page must have the clipboard-read permission, and may require a user gesture depending on the platform.",
+  "version": 1,
+  "steps": [
+    {
+      "id": "async-clipboard-read-text-step-1",
+      "stepNumber": 1,
+      "functionId": "third_party/blink/renderer/modules/clipboard/clipboard.cc:46",
+      "functionName": "Clipboard::readText",
+      "line": 46,
+      "action": "call",
+      "justification": "Entry point: JavaScript calls navigator.clipboard.readText(). The IDL binding (clipboard.idl) routes the call to this C++ method. The method receives a ScriptState (JS execution context) and an ExceptionState for error reporting.",
+      "variableState": {
+        "script_state": "<ScriptState* — current JS execution context>",
+        "exception_state": "<ExceptionState& — for reporting DOM exceptions>"
+      },
+      "sourceCode": "ScriptPromise<IDLString> Clipboard::readText(\n    ScriptState* script_state,\n    ExceptionState& exception_state) {\n  return ClipboardPromise::CreateForReadText(\n      GetExecutionContext(), script_state, exception_state);\n}",
+      "confidence": 1.0
+    },
+    {
+      "id": "async-clipboard-read-text-step-2",
+      "stepNumber": 2,
+      "functionId": "third_party/blink/renderer/modules/clipboard/clipboard_promise.cc:126",
+      "functionName": "ClipboardPromise::CreateForReadText",
+      "line": 126,
+      "action": "call",
+      "justification": "Creates a ScriptPromiseResolver that will eventually resolve with the clipboard text. A ClipboardPromise object is allocated (garbage-collected) to manage the async lifecycle. HandleReadText() is called to begin the permission check and read flow.",
+      "variableState": {
+        "context": "<ExecutionContext* — the Document/Worker context>",
+        "resolver": "<ScriptPromiseResolver<IDLString>* — resolves the JS Promise>",
+        "clipboard_promise": "<ClipboardPromise* — manages async clipboard read>"
+      },
+      "sourceCode": "ScriptPromise<IDLString> ClipboardPromise::CreateForReadText(\n    ExecutionContext* context,\n    ScriptState* script_state,\n    ExceptionState& exception_state) {\n  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver<IDLString>>(...);\n  ClipboardPromise* clipboard_promise =\n      MakeGarbageCollected<ClipboardPromise>(context, resolver, exception_state);\n  clipboard_promise->HandleReadText();\n  return resolver->Promise();\n}",
+      "confidence": 0.98
+    },
+    {
+      "id": "async-clipboard-read-text-step-3",
+      "stepNumber": 3,
+      "functionId": "third_party/blink/renderer/modules/clipboard/clipboard_promise.cc:286",
+      "functionName": "ClipboardPromise::HandleReadText",
+      "line": 286,
+      "action": "call",
+      "justification": "Initiates a permission check for CLIPBOARD_READ. The permission system is async — it may show a permission prompt to the user. ValidatePreconditions() checks both the Permissions API status and execution context validity.",
+      "variableState": {
+        "permission": "mojom::blink::PermissionName::CLIPBOARD_READ",
+        "will_be_sanitized": true,
+        "callback": "ClipboardPromise::HandleReadTextWithPermission"
+      },
+      "sourceCode": "void ClipboardPromise::HandleReadText() {\n  ValidatePreconditions(\n      mojom::blink::PermissionName::CLIPBOARD_READ,\n      /*will_be_sanitized=*/true,\n      BindOnce(&ClipboardPromise::HandleReadTextWithPermission,\n               WrapPersistent(this)));\n}",
+      "confidence": 0.98
+    },
+    {
+      "id": "async-clipboard-read-text-step-4",
+      "stepNumber": 4,
+      "functionId": "third_party/blink/renderer/modules/clipboard/clipboard_promise.cc:490",
+      "functionName": "ClipboardPromise::HandleReadTextWithPermission",
+      "line": 490,
+      "action": "branch_taken",
+      "justification": "BRANCH: Permission status == GRANTED. In this scenario, the user has already granted clipboard-read permission to this origin (e.g., via a previous prompt or site settings). If permission were DENIED, the promise would reject with NotAllowedError.",
+      "variableState": {
+        "status": "mojom::blink::PermissionStatus::GRANTED"
+      },
+      "sourceCode": "void ClipboardPromise::HandleReadTextWithPermission(\n    mojom::blink::PermissionStatus status) {\n  if (status != mojom::blink::PermissionStatus::GRANTED) {\n    script_promise_resolver_->RejectWithDOMException(\n        DOMExceptionCode::kNotAllowedError, \"Read permission denied.\");\n    return;\n  }\n  // ... proceed with read\n}",
+      "confidence": 0.95
+    },
+    {
+      "id": "async-clipboard-read-text-step-5",
+      "stepNumber": 5,
+      "functionId": "third_party/blink/renderer/modules/clipboard/clipboard_promise.cc:510",
+      "functionName": "ClipboardPromise::HandleReadTextWithPermission",
+      "line": 510,
+      "action": "branch_skipped",
+      "justification": "BRANCH SKIPPED: macOS platform permission check. The RuntimeEnabledFeatures::MacSystemClipboardPermissionCheckEnabled() flag is false on non-macOS platforms. On macOS, this would check system-level clipboard access permission. Since we're tracing a generic/Linux path, this branch is skipped.",
+      "variableState": {
+        "BUILDFLAG_IS_MAC": false,
+        "MacSystemClipboardPermissionCheckEnabled": false
+      },
+      "sourceCode": "#if BUILDFLAG(IS_MAC)\n  if (RuntimeEnabledFeatures::MacSystemClipboardPermissionCheckEnabled()) {\n    GetSystemClipboard()->GetPlatformPermissionState(...);\n    return;\n  }\n#endif",
+      "confidence": 0.90
+    },
+    {
+      "id": "async-clipboard-read-text-step-6",
+      "stepNumber": 6,
+      "functionId": "third_party/blink/renderer/core/clipboard/system_clipboard.cc:112",
+      "functionName": "SystemClipboard::ReadPlainText",
+      "line": 112,
+      "action": "call",
+      "justification": "The ClipboardPromise calls GetSystemClipboard()->ReadPlainText() to read from the system clipboard. SystemClipboard is the renderer-side bridge to the browser process clipboard. It holds a Mojo remote (ClipboardHost) that communicates with ClipboardHostImpl in the browser process.",
+      "variableState": {
+        "buffer": "mojom::blink::ClipboardBuffer::kStandard",
+        "clipboard_": "<HeapMojoRemote<ClipboardHost> — bound to browser process>"
+      },
+      "sourceCode": "String SystemClipboard::ReadPlainText(\n    mojom::blink::ClipboardBuffer buffer) {\n  if (!IsValidBufferType(buffer) || !clipboard_.is_bound())\n    return String();\n  if (snapshot_ && snapshot_->HasPlainText(buffer)) {\n    return snapshot_->PlainText(buffer);\n  }\n  String text;\n  clipboard_->ReadText(buffer, &text);  // SYNC MOJO CALL\n  return text;\n}",
+      "confidence": 0.95
+    },
+    {
+      "id": "async-clipboard-read-text-step-7",
+      "stepNumber": 7,
+      "functionId": "third_party/blink/renderer/core/clipboard/system_clipboard.cc:115",
+      "functionName": "SystemClipboard::ReadPlainText",
+      "line": 115,
+      "action": "branch_skipped",
+      "justification": "BRANCH SKIPPED: Snapshot cache check. snapshot_ is null because no clipboard snapshot has been taken. If a snapshot existed and had cached plain text, it would return immediately without IPC. This optimization avoids redundant IPC calls when multiple reads happen in sequence.",
+      "variableState": {
+        "snapshot_": null,
+        "has_cached_text": false
+      },
+      "sourceCode": "if (snapshot_ && snapshot_->HasPlainText(buffer)) {\n  return snapshot_->PlainText(buffer);\n}",
+      "confidence": 0.88
+    },
+    {
+      "id": "async-clipboard-read-text-step-8",
+      "stepNumber": 8,
+      "functionId": "third_party/blink/renderer/core/clipboard/system_clipboard.cc:120",
+      "functionName": "SystemClipboard::ReadPlainText (Mojo IPC)",
+      "line": 120,
+      "action": "call",
+      "justification": "SYNCHRONOUS MOJO IPC CALL: clipboard_->ReadText(buffer, &text). This is a sync IPC call from the renderer to the browser process. The [Sync] attribute in clipboard.mojom means the renderer thread blocks until the browser responds. The call crosses process boundaries via the Mojo pipe established in SystemClipboard's constructor.",
+      "variableState": {
+        "mojo_call": "ClipboardHost::ReadText(ClipboardBuffer::kStandard)",
+        "ipc_type": "synchronous",
+        "direction": "renderer → browser"
+      },
+      "sourceCode": "// clipboard.mojom:\n// interface ClipboardHost {\n//   [Sync] ReadText(ClipboardBuffer buffer) => (BigString16 result);\n// };\n\nString text;\nclipboard_->ReadText(buffer, &text);",
+      "confidence": 0.98
+    },
+    {
+      "id": "async-clipboard-read-text-step-9",
+      "stepNumber": 9,
+      "functionId": "content/browser/renderer_host/clipboard_host_impl.cc:231",
+      "functionName": "ClipboardHostImpl::ReadText",
+      "line": 231,
+      "action": "call",
+      "justification": "Browser process receives the Mojo IPC call. ClipboardHostImpl implements the ClipboardHost Mojo interface. It first checks IsRendererPasteAllowed() — a security check that verifies the renderer is allowed to read the clipboard. This is a defense-in-depth measure beyond the permission check.",
+      "variableState": {
+        "clipboard_buffer": "ui::ClipboardBuffer::kCopyPaste",
+        "render_frame_host": "<RenderFrameHost* — the frame that initiated the read>"
+      },
+      "sourceCode": "void ClipboardHostImpl::ReadText(\n    ui::ClipboardBuffer clipboard_buffer,\n    ReadTextCallback callback) {\n  if (!IsRendererPasteAllowed(clipboard_buffer, render_frame_host())) {\n    std::move(callback).Run(std::u16string());\n    return;\n  }\n  ExtractText(clipboard_buffer, CreateDataEndpoint(),\n              base::BindOnce(&ClipboardHostImpl::OnReadText, ...));\n}",
+      "confidence": 0.95
+    },
+    {
+      "id": "async-clipboard-read-text-step-10",
+      "stepNumber": 10,
+      "functionId": "content/browser/renderer_host/clipboard_host_impl.cc:235",
+      "functionName": "ClipboardHostImpl::ReadText",
+      "line": 235,
+      "action": "branch_taken",
+      "justification": "BRANCH: IsRendererPasteAllowed() returns true. The renderer is allowed to paste because the page has the clipboard-read permission and the security checks pass. If this returned false, an empty string would be returned immediately.",
+      "variableState": {
+        "paste_allowed": true
+      },
+      "sourceCode": "if (!IsRendererPasteAllowed(clipboard_buffer, render_frame_host())) {\n  std::move(callback).Run(std::u16string());\n  return;\n}",
+      "confidence": 0.92
+    },
+    {
+      "id": "async-clipboard-read-text-step-11",
+      "stepNumber": 11,
+      "functionId": "content/browser/renderer_host/clipboard_host_impl.cc:1030",
+      "functionName": "ClipboardHostImpl::ExtractText",
+      "line": 1030,
+      "action": "call",
+      "justification": "ExtractText() gets the platform clipboard instance via ui::Clipboard::GetForCurrentThread() and calls ReadText() on it. This is the bridge from the content layer to the ui/base clipboard abstraction.",
+      "variableState": {
+        "clipboard": "<ui::Clipboard* — platform clipboard singleton>",
+        "data_dst": "<DataTransferEndpoint — identifies the destination context>"
+      },
+      "sourceCode": "clipboard->ReadText(clipboard_buffer, data_dst, std::move(callback));",
+      "confidence": 0.93
+    },
+    {
+      "id": "async-clipboard-read-text-step-12",
+      "stepNumber": 12,
+      "functionId": "ui/base/clipboard/clipboard.h:ReadText",
+      "functionName": "ui::Clipboard::ReadText (virtual dispatch)",
+      "line": 0,
+      "action": "dispatch",
+      "justification": "VIRTUAL DISPATCH: ui::Clipboard::ReadText() is a pure virtual method. The concrete implementation depends on the platform. On Linux/ChromeOS it dispatches to ClipboardOzone, on Windows to ClipboardWin, on macOS to ClipboardMac. In this scenario (Linux), it dispatches to ClipboardOzone::ReadText() which uses the Ozone platform layer to access X11/Wayland clipboard.",
+      "variableState": {
+        "platform": "Linux",
+        "dispatch_target": "ClipboardOzone::ReadText",
+        "alternatives": ["ClipboardWin::ReadText", "ClipboardMac::ReadText", "ClipboardIOS::ReadText"]
+      },
+      "sourceCode": "// clipboard.h (abstract):\nvirtual void ReadText(ClipboardBuffer buffer,\n                      std::optional<DataTransferEndpoint> data_dst,\n                      ReadTextCallback callback) const = 0;\n\n// Dispatches to platform-specific implementation",
+      "confidence": 0.90
+    },
+    {
+      "id": "async-clipboard-read-text-step-13",
+      "stepNumber": 13,
+      "functionId": "content/browser/renderer_host/clipboard_host_impl.cc:245",
+      "functionName": "ClipboardHostImpl::OnReadText",
+      "line": 245,
+      "action": "call",
+      "justification": "Callback after platform clipboard read completes. Wraps the text in ClipboardPasteData and runs it through PasteIfPolicyAllowed() — the enterprise data loss prevention (DLP) check. This ensures clipboard data complies with organizational policies.",
+      "variableState": {
+        "text": "\"Hello, World!\"",
+        "clipboard_paste_data.text": "\"Hello, World!\""
+      },
+      "sourceCode": "void ClipboardHostImpl::OnReadText(\n    ui::ClipboardBuffer clipboard_buffer,\n    ReadTextCallback callback,\n    std::u16string text) {\n  ClipboardPasteData clipboard_paste_data;\n  clipboard_paste_data.text = std::move(text);\n  PasteIfPolicyAllowed(clipboard_buffer, ..., std::move(clipboard_paste_data), ...);\n}",
+      "confidence": 0.93
+    },
+    {
+      "id": "async-clipboard-read-text-step-14",
+      "stepNumber": 14,
+      "functionId": "content/browser/renderer_host/clipboard_host_impl.cc:260",
+      "functionName": "PasteIfPolicyAllowed callback",
+      "line": 260,
+      "action": "call",
+      "justification": "The DLP policy check passes (no enterprise policy blocks this paste). The callback extracts the text from ClipboardPasteData and invokes the original ReadTextCallback, which sends the response back through the Mojo pipe to the renderer process.",
+      "variableState": {
+        "clipboard_paste_data": "{ text: \"Hello, World!\" }",
+        "result": "\"Hello, World!\""
+      },
+      "sourceCode": "base::BindOnce(\n    [](ReadTextCallback callback,\n       std::optional<ClipboardPasteData> clipboard_paste_data) {\n      std::u16string result;\n      if (clipboard_paste_data) {\n        result = std::move(clipboard_paste_data->text);\n      }\n      std::move(callback).Run(std::move(result));\n    },\n    std::move(callback))",
+      "confidence": 0.92
+    },
+    {
+      "id": "async-clipboard-read-text-step-15",
+      "stepNumber": 15,
+      "functionId": "third_party/blink/renderer/modules/clipboard/clipboard_promise.cc:520",
+      "functionName": "ClipboardPromise (Promise Resolution)",
+      "line": 520,
+      "action": "return",
+      "justification": "The Mojo IPC returns to the renderer process with the clipboard text. The ScriptPromiseResolver resolves the JavaScript Promise with the text string. The web page's .then() handler or await expression receives \"Hello, World!\" — completing the navigator.clipboard.readText() call.",
+      "variableState": {
+        "text": "\"Hello, World!\"",
+        "promise_state": "resolved"
+      },
+      "sourceCode": "String text = GetSystemClipboard()->ReadPlainText(\n    mojom::blink::ClipboardBuffer::kStandard);\nscript_promise_resolver_->DowncastTo<IDLString>()->Resolve(text);",
+      "confidence": 0.95
+    }
+  ],
+  "metadata": {
+    "codebase": "chromium/src",
+    "keyFiles": [
+      "third_party/blink/renderer/modules/clipboard/clipboard.idl",
+      "third_party/blink/renderer/modules/clipboard/clipboard.h",
+      "third_party/blink/renderer/modules/clipboard/clipboard.cc",
+      "third_party/blink/renderer/modules/clipboard/clipboard_promise.h",
+      "third_party/blink/renderer/modules/clipboard/clipboard_promise.cc",
+      "third_party/blink/renderer/core/clipboard/system_clipboard.h",
+      "third_party/blink/renderer/core/clipboard/system_clipboard.cc",
+      "third_party/blink/public/mojom/clipboard/clipboard.mojom",
+      "content/browser/renderer_host/clipboard_host_impl.h",
+      "content/browser/renderer_host/clipboard_host_impl.cc",
+      "ui/base/clipboard/clipboard.h"
+    ],
+    "securityCheckpoints": [
+      "SecureContext requirement (HTTPS only)",
+      "Permissions API: clipboard-read",
+      "IsRendererPasteAllowed() browser-side check",
+      "PasteIfPolicyAllowed() enterprise DLP check",
+      "macOS system clipboard permission (platform-specific)"
+    ],
+    "ipcBoundaries": [
+      {
+        "type": "Mojo IPC (Sync)",
+        "from": "Renderer: SystemClipboard",
+        "to": "Browser: ClipboardHostImpl",
+        "interface": "blink::mojom::ClipboardHost",
+        "method": "ReadText"
+      }
+    ]
+  }
+}

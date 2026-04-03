@@ -237,7 +237,41 @@ codegraph stats
 
 ---
 
-## CLI Reference
+## Real-World Example: Chromium Clipboard readText
+
+The repository includes a pre-built scenario tracing `navigator.clipboard.readText()` through the Chromium codebase — from JavaScript API to OS clipboard access. This demonstrates CodeGraph on a real, large-scale C++ codebase.
+
+```bash
+# Import the pre-built Chromium clipboard scenario
+codegraph import scenarios/async-clipboard-read-text.json
+
+# View the 15-step execution trace
+codegraph view async-clipboard-read-text
+
+# Walk through it interactively
+codegraph walk async-clipboard-read-text
+
+# Export as Mermaid flowchart for docs
+codegraph export async-clipboard-read-text --format mermaid
+```
+
+The scenario traces through:
+1. **Blink Renderer** — `Clipboard::readText()` → `ClipboardPromise::CreateForReadText()`
+2. **Permission Check** — `ValidatePreconditions(CLIPBOARD_READ)`
+3. **System Clipboard Bridge** — `SystemClipboard::ReadPlainText()`
+4. **Mojo IPC** — Synchronous cross-process call from renderer to browser
+5. **Browser Process** — `ClipboardHostImpl::ReadText()` → paste policy check
+6. **Platform Dispatch** — Virtual dispatch to `ClipboardOzone`/`ClipboardWin`/`ClipboardMac`
+7. **Promise Resolution** — Text returned through IPC → JS Promise resolves
+
+Each step includes AI justification for branch decisions (e.g., "Permission is GRANTED because...") and imagined variable values. You can correct any step:
+
+```bash
+codegraph correct async-clipboard-read-text --step 5 \
+  --message "On macOS, the platform permission check IS enabled by default"
+```
+
+---
 
 ```
 codegraph <command> [options]
@@ -366,7 +400,66 @@ Show aggregate graph statistics.
 
 ```bash
 codegraph stats
+codegraph stats --format json
 ```
+
+#### `codegraph explore`
+
+**Interactive explorer** — menu-driven access to all features. Launches automatically when no command is given. Use `--mock` for demo mode without Neo4j.
+
+```bash
+codegraph explore
+codegraph explore --mock     # demo mode, no Neo4j needed
+codegraph                    # same as 'explore'
+```
+
+#### `codegraph view <id>`
+
+Rich scenario viewer with multiple output formats. AI-friendly JSON output.
+
+```bash
+codegraph view async-clipboard-read-text              # table view
+codegraph view async-clipboard-read-text --step 8     # single step detail
+codegraph view async-clipboard-read-text --format json # JSON for AI
+```
+
+#### `codegraph functions`
+
+Browse and search indexed functions.
+
+```bash
+codegraph functions --search "readText"
+codegraph functions --file src/pipeline.ts
+codegraph functions --class FileProcessingPipeline --format json
+```
+
+#### `codegraph export <id>`
+
+Export a scenario to JSON, Markdown, Mermaid flowchart, or Cypher.
+
+```bash
+codegraph export async-clipboard-read-text --format json > scenario.json
+codegraph export async-clipboard-read-text --format mermaid
+codegraph export async-clipboard-read-text --format markdown
+```
+
+#### `codegraph import <file>`
+
+Import a scenario from a JSON file.
+
+```bash
+codegraph import scenarios/async-clipboard-read-text.json
+```
+
+#### `codegraph diff <id>`
+
+Compare scenario versions after corrections.
+
+```bash
+codegraph diff async-clipboard-read-text --v1 1 --v2 2
+```
+
+> **Full CLI reference:** See [`docs/next/cli-reference.md`](docs/next/cli-reference.md)
 
 ---
 

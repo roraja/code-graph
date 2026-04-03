@@ -7,17 +7,24 @@
  * Each command is defined in its own module under `./commands/`.
  *
  * Usage:
- *   codegraph init          Initialize a new project
- *   codegraph index <dir>   Index a codebase
- *   codegraph discover      Discover scenarios
- *   codegraph trace <id>    Trace a scenario
- *   codegraph walk <id>     Interactive walkthrough
- *   codegraph correct <id>  Submit a correction
- *   codegraph query ...     Query the graph
- *   codegraph serve         Start the API server
- *   codegraph doctor        Check system health
- *   codegraph stats         Show graph statistics
- *   codegraph scenarios     List scenarios
+ *   codegraph init              Initialize a new project
+ *   codegraph index <dir>       Index a codebase
+ *   codegraph discover          Discover scenarios
+ *   codegraph trace <id>        Trace a scenario
+ *   codegraph walk <id>         Interactive walkthrough
+ *   codegraph correct <id>      Submit a correction
+ *   codegraph query ...         Query the graph
+ *   codegraph serve             Start the API server
+ *   codegraph doctor            Check system health
+ *   codegraph stats             Show graph statistics
+ *   codegraph scenarios         List scenarios
+ *   codegraph explore           Interactive codebase exploration
+ *   codegraph interactive       Alias for explore
+ *   codegraph view <id>         Rich scenario viewer
+ *   codegraph export <id>       Export scenario (json/markdown/mermaid/cypher)
+ *   codegraph import <file>     Import scenario from JSON
+ *   codegraph functions         Browse/search functions
+ *   codegraph diff <id>         Compare scenario versions
  *
  * @module cli
  */
@@ -35,6 +42,13 @@ import { registerServeCommand } from './commands/serve.js';
 import { registerDoctorCommand } from './commands/doctor.js';
 import { registerStatsCommand } from './commands/stats.js';
 import { registerScenariosCommand } from './commands/scenarios.js';
+import { registerExploreCommand } from './commands/explore.js';
+import { registerViewScenarioCommand } from './commands/view-scenario.js';
+import { registerExportCommand } from './commands/export.js';
+import { registerImportScenarioCommand } from './commands/import-scenario.js';
+import { registerFunctionsCommand } from './commands/functions.js';
+import { registerDiffCommand } from './commands/diff.js';
+import { registerInteractiveCommand } from './commands/interactive.js';
 
 /** Create and configure the CLI program. */
 function createProgram(): Command {
@@ -59,10 +73,25 @@ function createProgram(): Command {
   registerDoctorCommand(program);
   registerStatsCommand(program);
   registerScenariosCommand(program);
+  registerExploreCommand(program);
+  registerViewScenarioCommand(program);
+  registerExportCommand(program);
+  registerImportScenarioCommand(program);
+  registerFunctionsCommand(program);
+  registerDiffCommand(program);
+  registerInteractiveCommand(program);
 
-  // Show help by default when no command is given
-  program.action(() => {
-    program.outputHelp();
+  // Launch interactive explore when no command is given
+  program.action(async () => {
+    console.log(chalk.dim('No command specified. Launching interactive explorer...'));
+    console.log(chalk.dim('Use --help to see all commands.'));
+    console.log();
+    const exploreCmd = program.commands.find((c) => c.name() === 'explore');
+    if (exploreCmd) {
+      await exploreCmd.parseAsync(['node', 'codegraph', 'explore', '--mock']);
+    } else {
+      program.outputHelp();
+    }
   });
 
   return program;
