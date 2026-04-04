@@ -38,6 +38,36 @@ export interface Scenario {
   updatedAt: string;
 }
 
+/** A single frame in the call stack at a given step */
+export interface CallStackFrame {
+  /** Depth in the call stack (0 = entry function) */
+  depth: number;
+  /** Function ID for this frame */
+  functionId: string;
+  /** Qualified function name */
+  functionName: string;
+  /** File path where the function is defined */
+  filePath: string;
+  /** Line number where execution is at in this frame */
+  line: number;
+  /** Variable values imagined by AI for this stack frame */
+  variables: Record<string, FrameVariable>;
+}
+
+/** A variable value within a stack frame, with AI-generated metadata */
+export interface FrameVariable {
+  /** The imagined value as a display string */
+  value: string;
+  /** The declared or inferred type */
+  type: string;
+  /** AI explanation of why this value was chosen */
+  rationale: string;
+  /** Alternative possible values */
+  alternatives: string[];
+  /** Confidence in this imagined value (0.0 - 1.0) */
+  confidence: number;
+}
+
 /** A single step in a scenario's execution trace */
 export interface ScenarioStep {
   id: string;
@@ -62,6 +92,8 @@ export interface ScenarioStep {
   sourceCode?: string;
   /** Confidence in this step */
   confidence: number;
+  /** The call stack at this step, from entry function (depth 0) to current (deepest) */
+  callStack?: CallStackFrame[];
 }
 
 /** Input for creating a new scenario */
@@ -178,7 +210,8 @@ export class ScenarioEngine {
            correctedBy: $correctedBy,
            correctionNote: $correctionNote,
            sourceCode: $sourceCode,
-           confidence: $confidence
+           confidence: $confidence,
+           callStack: $callStack
          })
          CREATE (s)-[:HAS_STEP {order: $stepNumber}]->(step)`,
         {
@@ -188,6 +221,7 @@ export class ScenarioEngine {
           correctedBy: step.correctedBy ?? null,
           correctionNote: step.correctionNote ?? null,
           sourceCode: step.sourceCode ?? null,
+          callStack: step.callStack ? JSON.stringify(step.callStack) : null,
         }
       );
     }
@@ -326,6 +360,16 @@ export class ScenarioEngine {
       // ignore parse errors
     }
 
+    let callStack: CallStackFrame[] | undefined;
+    try {
+      const cs = props['callStack'];
+      if (cs) {
+        callStack = typeof cs === 'string' ? JSON.parse(cs) : (cs as CallStackFrame[]);
+      }
+    } catch {
+      // ignore parse errors
+    }
+
     return {
       id: String(props['id'] ?? ''),
       scenarioId,
@@ -340,6 +384,7 @@ export class ScenarioEngine {
       correctionNote: props['correctionNote'] as string | undefined,
       sourceCode: props['sourceCode'] as string | undefined,
       confidence: Number(props['confidence'] ?? 0),
+      callStack,
     };
   }
 }

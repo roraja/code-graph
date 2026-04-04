@@ -16,7 +16,7 @@ import type { PathTracerAgent } from '../ai/path-tracer.js';
 import type { VariableImaginerAgent } from '../ai/variable-imaginer.js';
 import type { JustifierAgent } from '../ai/justifier.js';
 import type { QueryEngine, CallRelation } from '../graph/queries.js';
-import type { Scenario, ScenarioStep } from './engine.js';
+import type { Scenario, ScenarioStep, CallStackFrame, FrameVariable } from './engine.js';
 import { createModuleLogger } from '../config/logger.js';
 
 const log = createModuleLogger('tracer');
@@ -71,6 +71,8 @@ interface TraceContext {
   stepCounter: number;
   /** Functions already traced (to avoid infinite loops) */
   visitedFunctions: Set<string>;
+  /** Live call stack — pushed on entry, popped on return */
+  callStackFrames: CallStackFrame[];
   /** Metrics */
   functionsTraversed: number;
   branchDecisions: number;
@@ -120,6 +122,7 @@ export class ScenarioTracer {
       depth: 0,
       stepCounter: 0,
       visitedFunctions: new Set(),
+      callStackFrames: [],
       functionsTraversed: 0,
       branchDecisions: 0,
       dispatchesResolved: 0,
@@ -218,6 +221,10 @@ export class ScenarioTracer {
     ctx.functionsTraversed++;
     ctx.depth++;
 
+    // Push a new frame onto the call stack
+    const frame = await this.buildCallStackFrame(ctx, func);
+    ctx.callStackFrames.push(frame);
+
     try {
       // Record the function entry step
       const entryStep = this.createStep(ctx, func, func.startLine, 'call',
@@ -249,6 +256,8 @@ export class ScenarioTracer {
         `Returning from ${func.qualifiedName}`);
       ctx.steps.push(returnStep);
     } finally {
+      // Pop the frame off the call stack
+      ctx.callStackFrames.pop();
       ctx.depth--;
     }
   }
@@ -388,6 +397,18 @@ export class ScenarioTracer {
     justification: string
   ): Omit<ScenarioStep, 'scenarioId'> {
     const stepNumber = ++ctx.stepCounter;
+
+    // Snapshot the current call stack (deep copy)
+    const callStack = ctx.callStackFrames.map(frame => ({
+      ...frame,
+      variables: { ...frame.variables },
+    }));
+
+    // Update the current (top) frame's line to the active line
+    if (callStack.length > 0) {
+      callStack[callStack.length - 1]!.line = line;
+    }
+
     return {
       id: `${ctx.scenario.id}-step-${stepNumber}`,
       stepNumber,
@@ -399,6 +420,66 @@ export class ScenarioTracer {
       variableState: { ...ctx.variableState },
       sourceCode: func.sourceCode,
       confidence: 1.0,
+      callStack,
+    };
+  }
+
+  /**
+   * Build a CallStackFrame for a function being entered.
+   * Uses the VariableImaginerAgent to imagine values for the function's parameters.
+   */
+  private async buildCallStackFrame(
+    ctx: TraceContext,
+    func: FunctionNode
+  ): Promise<CallStackFrame> {
+    const filePath = func.filePath || (func.id.includes(':') ? func.id.split(':').slice(0, -1).join(':') : func.id);
+
+    const variables: Record<string, FrameVariable> = {};
+
+    // Imagine values for each parameter of the function
+    if (func.parameters && func.parameters.length > 0) {
+      for (const param of func.parameters) {
+        try {
+          const result = await this.variableImaginer.imagine({
+            variableName: param.name,
+            variableType: param.type || 'unknown',
+            scenario: {
+              scenarioId: ctx.scenario.id,
+              scenarioName: ctx.scenario.name,
+              scenarioDescription: ctx.scenario.description,
+            },
+            surroundingCode: func.sourceCode,
+            existingState: ctx.variableState,
+            functionName: func.qualifiedName,
+          });
+
+          variables[param.name] = {
+            value: result.value,
+            type: param.type || 'unknown',
+            rationale: result.justification,
+            alternatives: result.alternatives,
+            confidence: result.confidence,
+          };
+        } catch (err) {
+          log.debug(`Failed to imagine variable ${param.name} in ${func.qualifiedName}: ${err instanceof Error ? err.message : String(err)}`);
+          variables[param.name] = {
+            value: param.defaultValue ?? 'undefined',
+            type: param.type || 'unknown',
+            rationale: 'Default value (AI imagination unavailable)',
+            alternatives: [],
+            confidence: 0.1,
+          };
+        }
+      }
+    }
+
+    return {
+      depth: ctx.depth - 1, // depth was already incremented before this call
+      functionId: func.id,
+      functionName: func.qualifiedName,
+      filePath,
+      line: func.startLine,
+      variables,
     };
   }
 }
