@@ -18,6 +18,7 @@ import { CodeIndexer } from './graph/indexer.js';
 import { QueryEngine, type CallRelation } from './graph/queries.js';
 import { ScenarioEngine, type Scenario, type ScenarioStep, type CreateScenarioInput, normalizeTags } from './scenario/engine.js';
 import { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
+import { ScenarioFileReader } from './scenario/file-reader.js';
 import { CorrectionEngine, type Correction, type StructuredCorrection } from './correction/engine.js';
 import { ScenarioDiscoveryAgent, type DiscoveredScenario, type ScenarioDiscoveryInput } from './ai/scenario-discovery.js';
 import { PathTracerAgent } from './ai/path-tracer.js';
@@ -419,6 +420,7 @@ export class CodeGraphClient {
   private scenarioTracer: ScenarioTracer | null = null;
   private correctionEngine: CorrectionEngine | null = null;
   private config: CodeGraphConfig | null = null;
+  private fileReader: ScenarioFileReader | null = null;
   private readonly isMock: boolean;
   private readonly projectRoot: string | undefined;
   private connected = false;
@@ -427,6 +429,12 @@ export class CodeGraphClient {
   constructor(options: CodeGraphClientOptions) {
     this.isMock = options.mock ?? false;
     this.projectRoot = options.projectRoot;
+
+    // Initialize file reader immediately — no database needed
+    const root = this.projectRoot ?? findProjectRoot() ?? undefined;
+    if (root) {
+      this.fileReader = new ScenarioFileReader(root);
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -530,7 +538,8 @@ export class CodeGraphClient {
   // -----------------------------------------------------------------------
 
   /**
-   * List all scenarios. Falls back to mock data when in mock mode.
+   * List all scenarios. Reads from JSON files on disk.
+   * Falls back to mock data when in mock mode with no project root.
    *
    * @param status - Optional status filter
    * @param tags - Optional tag filter (scenarios must have all specified tags)
@@ -539,6 +548,12 @@ export class CodeGraphClient {
     status?: 'draft' | 'traced' | 'validated' | 'corrected',
     tags?: string[],
   ): Promise<Scenario[]> {
+    // Use file reader if available
+    if (this.fileReader) {
+      return this.fileReader.listScenarios(status, tags);
+    }
+
+    // Mock fallback (no project root)
     if (this.isMock) {
       let all = getMockScenarios();
       if (status) all = all.filter((s) => s.status === status);
@@ -551,14 +566,22 @@ export class CodeGraphClient {
       return all;
     }
 
+    // Legacy: fall back to Neo4j if no file reader and not mock
     await this.ensureConnected();
     return this.scenarioEngine!.listScenarios(status, tags);
   }
 
   /**
    * Get a single scenario by ID, or `null` if not found.
+   * Reads from JSON files on disk.
    */
   async getScenario(id: string): Promise<Scenario | null> {
+    // Use file reader if available
+    if (this.fileReader) {
+      return this.fileReader.getScenario(id);
+    }
+
+    // Mock fallback
     if (this.isMock) {
       return getMockScenarios().find((s) => s.id === id) ?? null;
     }
@@ -569,8 +592,18 @@ export class CodeGraphClient {
 
   /**
    * Get a full scenario view (scenario + steps).
+   * Reads from JSON files on disk.
    */
   async getScenarioView(id: string): Promise<ScenarioView | null> {
+    // Use file reader if available
+    if (this.fileReader) {
+      const scenario = this.fileReader.getScenario(id);
+      if (!scenario) return null;
+      const steps = this.fileReader.getSteps(id);
+      return { scenario, steps };
+    }
+
+    // Mock fallback
     if (this.isMock) {
       const scenario = getMockScenarios().find((s) => s.id === id);
       if (!scenario) return null;
@@ -616,11 +649,17 @@ export class CodeGraphClient {
 
   /**
    * Get scenarios that include a specific function (by name or ID).
-   * Loads all scenarios and filters by checking step function names.
+   * Reads from JSON files on disk — scans steps in each scenario file.
    */
   async getScenariosForFunction(
     functionName: string,
   ): Promise<Scenario[]> {
+    // Use file reader if available
+    if (this.fileReader) {
+      return this.fileReader.getScenariosForFunction(functionName);
+    }
+
+    // Fall back to loading all scenarios and checking steps
     const allScenarios = await this.listScenarios();
     const matching: Scenario[] = [];
 

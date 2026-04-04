@@ -50,6 +50,7 @@ export { CorrectionInterpreterAgent } from './ai/correction-interpreter.js';
 // --- Scenario Layer ---
 export { ScenarioEngine, normalizeTags, type Scenario, type ScenarioStep, type CreateScenarioInput, type CallStackFrame, type FrameVariable } from './scenario/engine.js';
 export { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
+export { ScenarioFileReader } from './scenario/file-reader.js';
 
 // --- Correction Layer ---
 export {

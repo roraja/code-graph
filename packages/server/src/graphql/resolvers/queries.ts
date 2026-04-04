@@ -17,12 +17,13 @@ import type { ServerContext } from '../../context.js';
  * the GraphQL schema.
  */
 export const queryResolvers = {
-  // ------------------------------------------------------------------ 
-  // Scenarios
+  // ------------------------------------------------------------------
+  // Scenarios (read from JSON files on disk)
   // ------------------------------------------------------------------
 
   /**
    * List all scenarios, optionally filtered by status and/or tags.
+   * Reads from JSON files in .vscode/code-graph/scenarios/.
    */
   async scenarios(
     _parent: unknown,
@@ -33,29 +34,29 @@ export const queryResolvers = {
       | 'draft' | 'traced' | 'validated' | 'corrected'
       | undefined;
     const tags = args.filter?.tags;
-    return ctx.scenarioEngine.listScenarios(status, tags);
+    return ctx.scenarioFileReader.listScenarios(status, tags);
   },
 
   /**
-   * Get a single scenario by its ID.
+   * Get a single scenario by its ID from JSON files.
    */
   async scenario(
     _parent: unknown,
     args: { id: string },
     ctx: ServerContext,
   ) {
-    return ctx.scenarioEngine.getScenario(args.id);
+    return ctx.scenarioFileReader.getScenario(args.id);
   },
 
   /**
-   * Get walkthrough steps for a scenario.
+   * Get walkthrough steps for a scenario from JSON files.
    */
   async scenarioSteps(
     _parent: unknown,
     args: { scenarioId: string; from?: number; to?: number },
     ctx: ServerContext,
   ) {
-    return ctx.scenarioEngine.getSteps(args.scenarioId, args.from, args.to);
+    return ctx.scenarioFileReader.getSteps(args.scenarioId, args.from, args.to);
   },
 
   // ------------------------------------------------------------------
@@ -165,13 +166,14 @@ export const queryResolvers = {
 
   /**
    * Search scenarios by name, description, or tag substring.
+   * Reads from JSON files on disk.
    */
   async searchScenarios(
     _parent: unknown,
     args: { query: string },
     ctx: ServerContext,
   ) {
-    const all = await ctx.scenarioEngine.listScenarios();
+    const all = ctx.scenarioFileReader.listScenarios();
     const q = args.query.toLowerCase();
 
     // If the query looks like tag filters (starts with #), filter by tags

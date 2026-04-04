@@ -24,6 +24,7 @@ import {
   VariableImaginerAgent,
   JustifierAgent,
   CorrectionInterpreterAgent,
+  ScenarioFileReader,
   AIAgent,
   type ICodeParser,
   type AIProvider,
@@ -83,6 +84,8 @@ export interface ServerContext {
   parser: ICodeParser;
   /** Scenario lifecycle manager. */
   scenarioEngine: ScenarioEngine;
+  /** File-based scenario reader (reads from .vscode/code-graph/scenarios/). */
+  scenarioFileReader: ScenarioFileReader;
   /** Step-by-step scenario tracer. */
   scenarioTracer: ScenarioTracer;
   /** Human-correction processor. */
@@ -103,10 +106,12 @@ export interface ServerContext {
  * immediately.
  *
  * @param config - Validated CodeGraph project configuration.
+ * @param projectRoot - Optional project root path for file-based scenario reading.
  * @returns A ready-to-use server context.
  */
 export async function createServerContext(
   config: CodeGraphConfig,
+  projectRoot?: string,
 ): Promise<ServerContext> {
   // --- Graph layer ---
   const driver = new GraphDriver(
@@ -145,6 +150,9 @@ export async function createServerContext(
 
   // --- Domain engines ---
   const scenarioEngine = new ScenarioEngine(driver, queryEngine);
+  const scenarioFileReader = new ScenarioFileReader(
+    projectRoot ?? process.cwd(),
+  );
   const scenarioTracer = new ScenarioTracer(
     parser,
     queryEngine,
@@ -172,6 +180,7 @@ export async function createServerContext(
     queryEngine,
     parser,
     scenarioEngine,
+    scenarioFileReader,
     scenarioTracer,
     correctionEngine,
     discoveryAgent,

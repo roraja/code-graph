@@ -10,6 +10,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { loadCLIConfig, handleError } from '../helpers.js';
+import { findProjectRoot, type CodeGraphConfig } from '@codegraph/core';
 
 /**
  * Register the `serve` command on the CLI program.
@@ -37,7 +38,7 @@ export function registerServeCommand(program: Command): void {
         console.log();
 
         // Dynamically import the server package
-        let startServer: (config: typeof config) => Promise<unknown>;
+        let startServer: (config: CodeGraphConfig, projectRoot?: string) => Promise<unknown>;
         try {
           const serverModule = await import('@codegraph/server');
           startServer = serverModule.startServer ?? serverModule.default;
@@ -57,7 +58,7 @@ export function registerServeCommand(program: Command): void {
           server: { ...config.server, port, host },
         };
 
-        await startServer(serverConfig);
+        await startServer(serverConfig, configPath ?? findProjectRoot() ?? undefined);
 
         console.log();
         console.log(

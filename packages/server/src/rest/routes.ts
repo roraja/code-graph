@@ -67,7 +67,8 @@ export function createRestRouter(ctx: ServerContext): Router {
   // ------------------------------------------------------------------
 
   /**
-   * GET /api/scenarios — list scenarios with optional status and tag filters.
+   * GET /api/scenarios — list scenarios from JSON files on disk.
+   * Supports optional status and tag filters.
    */
   router.get('/api/scenarios', async (req: Request, res: Response) => {
     try {
@@ -76,7 +77,7 @@ export function createRestRouter(ctx: ServerContext): Router {
       const tags = tagsParam
         ? (Array.isArray(tagsParam) ? tagsParam : tagsParam.split(','))
         : undefined;
-      const scenarios = await ctx.scenarioEngine.listScenarios(
+      const scenarios = ctx.scenarioFileReader.listScenarios(
         status as 'draft' | 'traced' | 'validated' | 'corrected' | undefined,
         tags,
       );
@@ -132,11 +133,11 @@ export function createRestRouter(ctx: ServerContext): Router {
   });
 
   /**
-   * GET /api/scenarios/:id — get a single scenario by ID.
+   * GET /api/scenarios/:id — get a single scenario by ID from JSON files.
    */
   router.get('/api/scenarios/:id', async (req: Request, res: Response) => {
     try {
-      const scenario = await ctx.scenarioEngine.getScenario(req.params.id);
+      const scenario = ctx.scenarioFileReader.getScenario(req.params.id);
       if (!scenario) {
         res.status(404).json({ error: 'Scenario not found' });
         return;
@@ -148,13 +149,13 @@ export function createRestRouter(ctx: ServerContext): Router {
   });
 
   /**
-   * GET /api/scenarios/:id/steps — get walkthrough steps for a scenario.
+   * GET /api/scenarios/:id/steps — get walkthrough steps from JSON files.
    */
   router.get('/api/scenarios/:id/steps', async (req: Request, res: Response) => {
     try {
       const from = req.query.from ? Number(req.query.from) : undefined;
       const to = req.query.to ? Number(req.query.to) : undefined;
-      const steps = await ctx.scenarioEngine.getSteps(req.params.id, from, to);
+      const steps = ctx.scenarioFileReader.getSteps(req.params.id, from, to);
       res.json({ steps, totalSteps: steps.length });
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
@@ -163,11 +164,11 @@ export function createRestRouter(ctx: ServerContext): Router {
 
   /**
    * GET /api/scenarios/:id/steps/:stepNumber/callstack — get the call stack
-   * and per-frame variable values for a specific step.
+   * and per-frame variable values for a specific step from JSON files.
    */
   router.get('/api/scenarios/:id/steps/:stepNumber/callstack', async (req: Request, res: Response) => {
     try {
-      const step = await ctx.scenarioEngine.getStep(req.params.id, Number(req.params.stepNumber));
+      const step = ctx.scenarioFileReader.getStep(req.params.id, Number(req.params.stepNumber));
       if (!step) {
         res.status(404).json({ error: 'Step not found' });
         return;
@@ -399,16 +400,17 @@ export function createRestRouter(ctx: ServerContext): Router {
   /**
    * GET /api/graph/:scenarioId — get graph nodes and edges for a scenario.
    * Returns functions as nodes and calls as edges for Cytoscape visualization.
+   * Reads from JSON files on disk.
    */
   router.get('/api/graph/:scenarioId', async (req: Request, res: Response) => {
     try {
-      const scenario = await ctx.scenarioEngine.getScenario(req.params.scenarioId);
+      const scenario = ctx.scenarioFileReader.getScenario(req.params.scenarioId);
       if (!scenario) {
         res.status(404).json({ error: 'Scenario not found' });
         return;
       }
 
-      const steps = await ctx.scenarioEngine.getSteps(req.params.scenarioId);
+      const steps = ctx.scenarioFileReader.getSteps(req.params.scenarioId);
 
       // Build nodes from scenario steps (unique functions)
       const nodeMap = new Map<string, {

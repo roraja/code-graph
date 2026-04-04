@@ -15,7 +15,7 @@ import express from 'express';
 import cors from 'cors';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
-import { type CodeGraphConfig, loadConfig, logger } from '@codegraph/core';
+import { type CodeGraphConfig, loadConfig, findProjectRoot, logger } from '@codegraph/core';
 import { typeDefs } from './graphql/schema.js';
 import { resolvers } from './graphql/resolvers/index.js';
 import { createRestRouter } from './rest/routes.js';
@@ -28,11 +28,12 @@ import { createServerContext, type ServerContext } from './context.js';
  * optionally serves the web-UI static bundle, and begins listening.
  *
  * @param config - Validated CodeGraph project configuration.
+ * @param projectRoot - Optional project root for file-based scenario reading.
  * @returns An object with `close()` to shut down the server gracefully.
  */
-export async function startServer(config: CodeGraphConfig) {
+export async function startServer(config: CodeGraphConfig, projectRoot?: string) {
   // --- Server context (engines, agents, driver) ---
-  const ctx = await createServerContext(config);
+  const ctx = await createServerContext(config, projectRoot);
 
   // --- Express application ---
   const app = express();
@@ -103,8 +104,9 @@ const isDirectRun =
 if (isDirectRun) {
   (async () => {
     try {
-      const config = loadConfig();
-      await startServer(config);
+      const root = findProjectRoot() ?? undefined;
+      const config = loadConfig(root);
+      await startServer(config, root);
     } catch (err) {
       logger.error('Failed to start server: %s', err);
       process.exit(1);
