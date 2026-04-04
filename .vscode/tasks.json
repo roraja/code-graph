@@ -87,6 +87,50 @@
       "type": "shell",
       "command": "code --uninstall-extension codegraph.codegraph-navigator",
       "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Install/Update AI Skills",
+      "type": "shell",
+      "command": "bash ${workspaceFolder}/scripts/install-skills.sh",
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "CodeGraph: Install AI Skills (Claude only)",
+      "type": "shell",
+      "command": "bash ${workspaceFolder}/scripts/install-skills.sh --claude",
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "CodeGraph: Install AI Skills (Copilot only)",
+      "type": "shell",
+      "command": "bash ${workspaceFolder}/scripts/install-skills.sh --copilot",
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "CodeGraph: Check AI Skills Status",
+      "type": "shell",
+      "command": "bash ${workspaceFolder}/scripts/install-skills.sh --check",
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
     }
   ]
 }

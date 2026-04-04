@@ -25,6 +25,7 @@
  *   codegraph import <file>     Import scenario from JSON
  *   codegraph functions         Browse/search functions
  *   codegraph diff <id>         Compare scenario versions
+ *   codegraph install-skills    Install/update AI skills for Claude & Copilot
  *
  * @module cli
  */
@@ -49,6 +50,7 @@ import { registerImportScenarioCommand } from './commands/import-scenario.js';
 import { registerFunctionsCommand } from './commands/functions.js';
 import { registerDiffCommand } from './commands/diff.js';
 import { registerInteractiveCommand } from './commands/interactive.js';
+import { registerInstallSkillsCommand } from './commands/install-skills.js';
 
 /** Create and configure the CLI program. */
 function createProgram(): Command {
@@ -80,6 +82,7 @@ function createProgram(): Command {
   registerFunctionsCommand(program);
   registerDiffCommand(program);
   registerInteractiveCommand(program);
+  registerInstallSkillsCommand(program);
 
   // Launch interactive explore when no command is given
   program.action(async () => {
