@@ -6,6 +6,7 @@ import type {
   CallEdge,
   GraphData,
   DatabaseStats,
+  CallStackFrame,
 } from './types';
 
 const API_BASE = '/api';
@@ -162,4 +163,17 @@ export async function getStats(): Promise<DatabaseStats> {
  */
 export async function fetchConfig(): Promise<{ projectName: string; editor: { sshHost?: string } }> {
   return request<{ projectName: string; editor: { sshHost?: string } }>('/config');
+}
+
+/**
+ * Get the call stack and per-frame variable values for a specific scenario step.
+ * GET /api/scenarios/:id/steps/:stepNumber/callstack
+ */
+export async function fetchCallStack(
+  scenarioId: string,
+  stepNumber: number
+): Promise<{ stepNumber: number; functionName: string; callStack: CallStackFrame[] }> {
+  return request<{ stepNumber: number; functionName: string; callStack: CallStackFrame[] }>(
+    `/scenarios/${encodeURIComponent(scenarioId)}/steps/${stepNumber}/callstack`
+  );
 }

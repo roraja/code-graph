@@ -42,6 +42,36 @@ export interface Scenario {
   stepCount?: number;
 }
 
+/** A single frame in the call stack at a given step */
+export interface CallStackFrame {
+  /** Depth in the call stack (0 = entry function) */
+  depth: number;
+  /** Function ID for this frame */
+  functionId: string;
+  /** Qualified function name */
+  functionName: string;
+  /** File path where the function is defined */
+  filePath: string;
+  /** Line number where execution is at in this frame */
+  line: number;
+  /** Variable values imagined by AI for this stack frame */
+  variables: Record<string, FrameVariable>;
+}
+
+/** A variable value within a stack frame, with AI-generated metadata */
+export interface FrameVariable {
+  /** The imagined value as a display string */
+  value: string;
+  /** The declared or inferred type */
+  type: string;
+  /** AI explanation of why this value was chosen */
+  rationale: string;
+  /** Alternative possible values */
+  alternatives: string[];
+  /** Confidence in this imagined value (0.0 - 1.0) */
+  confidence: number;
+}
+
 /** A single step in a scenario execution trace. */
 export interface ScenarioStep {
   id: string;
@@ -57,6 +87,8 @@ export interface ScenarioStep {
   correctionNote?: string;
   sourceCode?: string;
   confidence: number;
+  /** The call stack at this step, from entry function (depth 0) to current (deepest) */
+  callStack?: CallStackFrame[];
 }
 
 /** A parsed function/method in the codebase. */

@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useScenarioStore } from '../stores/scenario';
 import { JustificationPanel } from './JustificationPanel';
+import { CallStackPanel } from './CallStackPanel';
+import { VariableDetailsPanel } from './VariableDetailsPanel';
 import { OpenInVSCode } from './OpenInVSCode';
-import type { StepAction } from '../types';
+import type { StepAction, CallStackFrame } from '../types';
 
 /** Icon mapping for step action types. */
 const ACTION_ICONS: Record<StepAction, string> = {
@@ -24,6 +26,9 @@ const ACTION_COLORS: Record<StepAction, string> = {
   return: '#607d8b',
   assign: '#00bcd4',
 };
+
+/** Tabs in the right side panel. */
+type SidePanelTab = 'justification' | 'callstack' | 'variables';
 
 const styles = {
   container: {
@@ -157,19 +162,44 @@ const styles = {
     color: '#d4d4d4',
   } as React.CSSProperties,
   sidePanel: {
-    width: 360,
+    width: 400,
     display: 'flex',
     flexDirection: 'column' as const,
     borderLeft: '1px solid #2d2d44',
-    overflow: 'auto',
+    overflow: 'hidden',
     background: '#121224',
   } as React.CSSProperties,
-  sidePanelSection: {
-    padding: 16,
+  sidePanelTabs: {
+    display: 'flex',
+    background: '#16162a',
     borderBottom: '1px solid #2d2d44',
+    padding: 0,
+    flexShrink: 0,
+  } as React.CSSProperties,
+  sidePanelTab: {
+    flex: 1,
+    padding: '8px 12px',
+    fontSize: 11,
+    fontWeight: 600,
+    color: '#888',
+    cursor: 'pointer',
+    borderBottom: '2px solid transparent',
+    transition: 'color 0.15s, border-color 0.15s',
+    textAlign: 'center' as const,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  } as React.CSSProperties,
+  sidePanelTabActive: {
+    color: '#e0e0e0',
+    borderBottomColor: '#7c4dff',
+  } as React.CSSProperties,
+  sidePanelContent: {
+    flex: 1,
+    overflow: 'auto',
+    padding: 16,
   } as React.CSSProperties,
   variablePanel: {
-    padding: 16,
+    padding: 0,
   } as React.CSSProperties,
   variableTitle: {
     fontSize: 12,
@@ -227,6 +257,8 @@ const styles = {
  * Walkthrough provides a step-by-step code walkthrough for a scenario.
  * Displays the current step's function name, file path, source code with
  * highlighted current line, variable state, and the AI's justification.
+ * Includes a call stack panel showing the complete call chain and per-frame
+ * variable values with AI-generated insights.
  * Supports navigation via Prev/Next/Jump controls.
  */
 export function Walkthrough(): React.JSX.Element {
@@ -238,6 +270,9 @@ export function Walkthrough(): React.JSX.Element {
     fetchScenario, fetchSteps, setCurrentStep,
   } = useScenarioStore();
 
+  const [activeSideTab, setActiveSideTab] = useState<SidePanelTab>('callstack');
+  const [selectedFrame, setSelectedFrame] = useState<CallStackFrame | null>(null);
+
   useEffect(() => {
     if (id) {
       fetchScenario(id);
@@ -246,6 +281,11 @@ export function Walkthrough(): React.JSX.Element {
   }, [id, fetchScenario, fetchSteps]);
 
   const step = steps[currentStep] ?? null;
+
+  // Reset selected frame when step changes
+  useEffect(() => {
+    setSelectedFrame(null);
+  }, [currentStep]);
 
   /** Parse source code into numbered lines. */
   const codeLines = useMemo(() => {
@@ -276,6 +316,15 @@ export function Walkthrough(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handler);
   }, [currentStep, setCurrentStep]);
 
+  /** Handle clicking a stack frame — show its variables. */
+  const handleFrameClick = (frame: CallStackFrame) => {
+    setSelectedFrame(prev => prev?.depth === frame.depth ? null : frame);
+    // If a frame with variables is clicked, switch to variables tab
+    if (frame.variables && Object.keys(frame.variables).length > 0) {
+      setActiveSideTab('variables');
+    }
+  };
+
   if (loading) return <div style={styles.loading}>Loading walkthrough…</div>;
   if (error) return <div style={styles.error}>⚠ {error}</div>;
   if (!step) {
@@ -292,6 +341,8 @@ export function Walkthrough(): React.JSX.Element {
   const varEntries = Object.entries(variableState);
   const isFirst = currentStep === 0;
   const isLast = currentStep === steps.length - 1;
+  const callStack = step.callStack ?? [];
+  const hasCallStack = callStack.length > 0;
 
   return (
     <div style={styles.container}>
@@ -313,6 +364,11 @@ export function Walkthrough(): React.JSX.Element {
           >
             {ACTION_ICONS[step.action]} {step.action.replace('_', ' ')}
           </span>
+          {hasCallStack && (
+            <span style={{ fontSize: 11, color: '#666', fontFamily: "'JetBrains Mono', monospace" }}>
+              depth {callStack.length}
+            </span>
+          )}
           {currentScenario && (
             <span style={{ fontSize: 13, color: '#888' }}>
               {currentScenario.name}
@@ -390,35 +446,115 @@ export function Walkthrough(): React.JSX.Element {
           </div>
         </div>
 
-        {/* Side panel: justification + variables */}
+        {/* Side panel: tabbed — Justification / Call Stack / Variables */}
         <div style={styles.sidePanel}>
-          <div style={styles.sidePanelSection}>
-            <JustificationPanel
-              justification={step.justification}
-              confidence={step.confidence}
-              variableState={step.variableState}
-              correctedBy={step.correctedBy}
-              correctionNote={step.correctionNote}
-            />
+          <div style={styles.sidePanelTabs}>
+            <div
+              style={{
+                ...styles.sidePanelTab,
+                ...(activeSideTab === 'justification' ? styles.sidePanelTabActive : {}),
+              }}
+              onClick={() => setActiveSideTab('justification')}
+            >
+              Justification
+            </div>
+            <div
+              style={{
+                ...styles.sidePanelTab,
+                ...(activeSideTab === 'callstack' ? styles.sidePanelTabActive : {}),
+              }}
+              onClick={() => setActiveSideTab('callstack')}
+            >
+              Call Stack
+              {hasCallStack && (
+                <span style={{ fontSize: 9, color: '#7c4dff', marginLeft: 4 }}>
+                  ({callStack.length})
+                </span>
+              )}
+            </div>
+            <div
+              style={{
+                ...styles.sidePanelTab,
+                ...(activeSideTab === 'variables' ? styles.sidePanelTabActive : {}),
+              }}
+              onClick={() => setActiveSideTab('variables')}
+            >
+              Variables
+            </div>
           </div>
 
-          {varEntries.length > 0 && (
-            <div style={styles.variablePanel}>
-              <div style={styles.variableTitle}>Cumulative Variable State</div>
-              <ul style={styles.varList}>
-                {varEntries.map(([name, value]) => (
-                  <li key={name} style={styles.varItem}>
-                    <span style={styles.varName}>{name}</span>
-                    <span style={styles.varValue} title={JSON.stringify(value)}>
-                      {typeof value === 'object'
-                        ? JSON.stringify(value)
-                        : String(value)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div style={styles.sidePanelContent}>
+            {/* Justification tab */}
+            {activeSideTab === 'justification' && (
+              <>
+                <JustificationPanel
+                  justification={step.justification}
+                  confidence={step.confidence}
+                  variableState={step.variableState}
+                  correctedBy={step.correctedBy}
+                  correctionNote={step.correctionNote}
+                />
+
+                {varEntries.length > 0 && (
+                  <div style={{ ...styles.variablePanel, marginTop: 16 }}>
+                    <div style={styles.variableTitle}>Cumulative Variable State</div>
+                    <ul style={styles.varList}>
+                      {varEntries.map(([name, value]) => (
+                        <li key={name} style={styles.varItem}>
+                          <span style={styles.varName}>{name}</span>
+                          <span style={styles.varValue} title={JSON.stringify(value)}>
+                            {typeof value === 'object'
+                              ? JSON.stringify(value)
+                              : String(value)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Call Stack tab */}
+            {activeSideTab === 'callstack' && (
+              <CallStackPanel
+                callStack={callStack}
+                stepNumber={step.stepNumber}
+                onFrameClick={handleFrameClick}
+              />
+            )}
+
+            {/* Variables tab — shows detailed per-frame variables */}
+            {activeSideTab === 'variables' && (
+              selectedFrame ? (
+                <VariableDetailsPanel frame={selectedFrame} />
+              ) : hasCallStack ? (
+                <VariableDetailsPanel frame={callStack[callStack.length - 1]!} />
+              ) : (
+                <div style={{ ...styles.variablePanel }}>
+                  <div style={styles.variableTitle}>Cumulative Variable State</div>
+                  {varEntries.length > 0 ? (
+                    <ul style={styles.varList}>
+                      {varEntries.map(([name, value]) => (
+                        <li key={name} style={styles.varItem}>
+                          <span style={styles.varName}>{name}</span>
+                          <span style={styles.varValue} title={JSON.stringify(value)}>
+                            {typeof value === 'object'
+                              ? JSON.stringify(value)
+                              : String(value)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div style={{ color: '#555', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
+                      No variable data available. Select a stack frame or trace the scenario to see variables.
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+          </div>
         </div>
       </div>
     </div>

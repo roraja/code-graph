@@ -90,6 +90,26 @@ export const typeDefs = gql`
     correctionNote: String
     sourceCode: String
     confidence: Float!
+    callStack: [CallStackFrame!]
+  }
+
+  """A single frame in the call stack at a given scenario step."""
+  type CallStackFrame {
+    depth: Int!
+    functionId: String!
+    functionName: String!
+    filePath: String!
+    line: Int!
+    variables: String
+  }
+
+  """A variable value within a stack frame, with AI-generated metadata."""
+  type FrameVariable {
+    value: String!
+    type: String!
+    rationale: String!
+    alternatives: [String!]!
+    confidence: Float!
   }
 
   """A parsed function node stored in the graph."""

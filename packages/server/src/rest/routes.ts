@@ -157,6 +157,27 @@ export function createRestRouter(ctx: ServerContext): Router {
   });
 
   /**
+   * GET /api/scenarios/:id/steps/:stepNumber/callstack — get the call stack
+   * and per-frame variable values for a specific step.
+   */
+  router.get('/api/scenarios/:id/steps/:stepNumber/callstack', async (req: Request, res: Response) => {
+    try {
+      const step = await ctx.scenarioEngine.getStep(req.params.id, Number(req.params.stepNumber));
+      if (!step) {
+        res.status(404).json({ error: 'Step not found' });
+        return;
+      }
+      res.json({
+        stepNumber: step.stepNumber,
+        functionName: step.functionName,
+        callStack: step.callStack ?? [],
+      });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
    * POST /api/scenarios/:id/trace — trace a scenario through the codebase.
    */
   router.post('/api/scenarios/:id/trace', async (req: Request, res: Response) => {
