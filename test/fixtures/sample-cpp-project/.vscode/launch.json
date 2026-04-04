@@ -1,0 +1,455 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    // -----------------------------------------------------------------------
+    // CLI Commands — debug CodeGraph CLI operations against this sample project
+    // -----------------------------------------------------------------------
+    {
+      "name": "Debug: Init Project",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["init", "--lang", "cpp", "--name", "sample-cpp-project", "--force"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Index Codebase",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["index", "src"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: List Functions",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["functions"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Search Functions",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["functions", "--search", "${input:functionSearch}"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Graph Stats",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["stats"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Doctor",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["doctor"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Discover Scenarios",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["discover", "--hint", "${input:discoverHint}"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "env": {
+        "CODEGRAPH_AI_MOCK": "true"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Discover for Function",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["discover", "--function", "${input:targetFunction}"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "env": {
+        "CODEGRAPH_AI_MOCK": "true"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: List Scenarios",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["scenarios"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Trace Scenario",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["trace", "${input:scenarioId}"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "env": {
+        "CODEGRAPH_AI_MOCK": "true"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: View Scenario",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["view-scenario", "${input:scenarioId}"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Query Callers",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["query", "callers", "${input:targetFunction}"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Query Callees",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["query", "callees", "${input:targetFunction}"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Query Path",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["query", "path", "${input:fromFunction}", "${input:toFunction}"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Export Graph (JSON)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["export", "--format", "json", "--output", "${workspaceFolder}/codegraph-export.json"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+
+    // -----------------------------------------------------------------------
+    // Server — debug the API server (GraphQL + REST + Web UI)
+    // -----------------------------------------------------------------------
+    {
+      "name": "Debug: Serve (API + Web UI)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/../../../packages/cli/dist/index.js",
+      "args": ["serve"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/server/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+
+    // -----------------------------------------------------------------------
+    // Core Engine — debug individual components directly via tsx
+    // -----------------------------------------------------------------------
+    {
+      "name": "Debug: C++ Parser (parse this project)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/../../../node_modules/.bin/tsx",
+      "runtimeArgs": ["--inspect"],
+      "args": [
+        "-e",
+        "import { CppParser } from '${workspaceFolder}/../../../packages/core/src/index.ts'; const p = new CppParser(); p.parseDirectory('${workspaceFolder}/src').then(r => { console.log('Files:', r.length); let fn=0,cl=0,ca=0,br=0; for(const f of r){fn+=f.functions.length;cl+=f.classes.length;ca+=f.calls.length;br+=f.branches.length;console.log(f.filePath.split('/').pop(),': classes='+f.classes.length+' fns='+f.functions.length+' calls='+f.calls.length+' branches='+f.branches.length);} console.log('Totals: classes='+cl+' fns='+fn+' calls='+ca+' branches='+br); });"
+      ],
+      "cwd": "${workspaceFolder}/../../../",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Current Open File (tsx)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/../../../node_modules/.bin/tsx",
+      "args": ["${file}"],
+      "cwd": "${workspaceFolder}/../../../",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+
+    // -----------------------------------------------------------------------
+    // Tests — debug unit and integration tests
+    // -----------------------------------------------------------------------
+    {
+      "name": "Debug: Unit Tests (all)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/../../../node_modules/.bin/vitest",
+      "args": ["run", "--reporter=verbose"],
+      "cwd": "${workspaceFolder}/../../../packages/core",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: C++ Parser Tests",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/../../../node_modules/.bin/vitest",
+      "args": ["run", "src/parser/cpp", "--reporter=verbose"],
+      "cwd": "${workspaceFolder}/../../../packages/core",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Debug: Current Test File",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/../../../node_modules/.bin/vitest",
+      "args": ["run", "${relativeFile}", "--reporter=verbose"],
+      "cwd": "${workspaceFolder}/../../../packages/core",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+
+    // -----------------------------------------------------------------------
+    // Attach — connect to an already-running Node.js process
+    // -----------------------------------------------------------------------
+    {
+      "name": "Attach: Node.js Process",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/../../../packages/cli/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/core/dist/**/*.js",
+        "${workspaceFolder}/../../../packages/server/dist/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/../../../packages/**/*.js",
+        "!**/node_modules/**"
+      ],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug: Full Pipeline (Init → Index → Stats)",
+      "configurations": [
+        "Debug: Init Project",
+        "Debug: Index Codebase",
+        "Debug: Graph Stats"
+      ],
+      "stopAll": true,
+      "presentation": {
+        "order": 1
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "functionSearch",
+      "type": "promptString",
+      "description": "Search pattern for function names (e.g., 'publish', 'Router', 'send')"
+    },
+    {
+      "id": "discoverHint",
+      "type": "promptString",
+      "description": "Hint for scenario discovery (e.g., 'publishing a high-priority message')"
+    },
+    {
+      "id": "targetFunction",
+      "type": "promptString",
+      "description": "Function name (e.g., 'MessageBroker::publish', 'TcpTransport::send', 'route')"
+    },
+    {
+      "id": "scenarioId",
+      "type": "promptString",
+      "description": "Scenario ID (from 'List Scenarios' output)"
+    },
+    {
+      "id": "fromFunction",
+      "type": "promptString",
+      "description": "Source function for path query (e.g., 'MessageBroker::publish')"
+    },
+    {
+      "id": "toFunction",
+      "type": "promptString",
+      "description": "Target function for path query (e.g., 'TcpTransport::sendWithRetry')"
+    }
+  ]
+}

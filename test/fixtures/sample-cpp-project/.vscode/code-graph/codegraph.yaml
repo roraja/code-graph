@@ -1,0 +1,38 @@
+# CodeGraph config for sample-cpp-project
+project:
+  name: "sample-cpp-project"
+  languages:
+    - "cpp"
+    - "h"
+  rootDirs:
+    - "src"
+  excludeDirs:
+    - "build"
+    - ".git"
+
+neo4j:
+  uri: "bolt://localhost:7687"
+  username: "neo4j"
+  password: "${CODEGRAPH_NEO4J_PASSWORD}"
+  database: "neo4j"
+
+ai:
+  provider: "copilot"
+  model: "gpt-4-turbo"
+  apiKey: "${CODEGRAPH_AI_API_KEY}"
+  maxTokensPerRequest: 120000
+  temperature: 0.2
+
+tracing:
+  maxDepth: 50
+  maxStepsPerFunction: 200
+  boringFunctions:
+    - "LOG*"
+    - "DCHECK*"
+    - "printf"
+  boringNamespaces: []
+  focusFunctions: []
+
+server:
+  port: 3000
+  host: "127.0.0.1"

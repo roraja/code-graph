@@ -1,0 +1,453 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CodeGraph: Reset Workspace",
+      "type": "shell",
+      "command": "rm -rf .vscode/code-graph/codegraph.yaml && cp ${workspaceFolder}/../../.codegraph.yaml.example .codegraph.yaml.bak 2>/dev/null; echo '--- Workspace reset complete ---'; echo 'Config removed. Run \"CodeGraph: Init Project\" to re-initialize.'",
+      "detail": "Remove the .vscode/code-graph folder to start fresh — simulates a clean first-time setup",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Full Reset (nuke graph + config)",
+      "type": "shell",
+      "command": "rm -rf .vscode/code-graph && rm -f .codegraph.yaml && echo '--- Full reset complete ---' && echo 'Removed .vscode/code-graph/ and .codegraph.yaml' && echo 'Run \"CodeGraph: Init Project\" to start over.'",
+      "detail": "Remove ALL CodeGraph artifacts — config, graph data, everything",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Init Project",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "init",
+        "--lang", "cpp",
+        "--name", "sample-cpp-project"
+      ],
+      "detail": "Initialize CodeGraph config (.vscode/code-graph/codegraph.yaml)",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Index Codebase",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "index",
+        "src"
+      ],
+      "detail": "Parse all C++ source files and index into the Neo4j graph database",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: List Functions",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "functions"
+      ],
+      "detail": "List all indexed functions in the graph",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Search Functions",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "functions",
+        "--search", "${input:functionSearch}"
+      ],
+      "detail": "Search for functions by name pattern",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Graph Stats",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "stats"
+      ],
+      "detail": "Show graph database statistics (files, functions, classes, calls, scenarios)",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Discover Scenarios",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "discover",
+        "--hint", "${input:discoverHint}"
+      ],
+      "detail": "Use AI to discover usage scenarios in the codebase",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Discover for Function",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "discover",
+        "--function", "${input:targetFunction}"
+      ],
+      "detail": "Discover scenarios involving a specific function",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: List Scenarios",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "scenarios"
+      ],
+      "detail": "List all discovered scenarios",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Trace Scenario",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "trace",
+        "${input:scenarioId}"
+      ],
+      "detail": "Trace a scenario step-by-step through the call graph",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Query Callers",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "query",
+        "callers",
+        "${input:targetFunction}"
+      ],
+      "detail": "Find all functions that call the given function",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Query Callees",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "query",
+        "callees",
+        "${input:targetFunction}"
+      ],
+      "detail": "Find all functions called by the given function",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Query Path",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "query",
+        "path",
+        "${input:fromFunction}",
+        "${input:toFunction}"
+      ],
+      "detail": "Find call path between two functions",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: View Scenario",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "view-scenario",
+        "${input:scenarioId}"
+      ],
+      "detail": "View detailed scenario information and traced steps",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Doctor",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "doctor"
+      ],
+      "detail": "Check system health — Neo4j connection, config, AI provider",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Serve (API + Web UI)",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "serve"
+      ],
+      "detail": "Start the CodeGraph server with API and web UI",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Export Graph",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "export",
+        "--format", "${input:exportFormat}",
+        "--output", "${workspaceFolder}/codegraph-export.${input:exportFormat}"
+      ],
+      "detail": "Export the graph data to a file",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Interactive Explorer",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/../../../packages/cli/dist/index.js",
+        "explore"
+      ],
+      "detail": "Launch interactive menu-driven codebase explorer",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph: Full Pipeline (Init → Index → Stats)",
+      "type": "shell",
+      "command": "node ${workspaceFolder}/../../../packages/cli/dist/index.js init --lang cpp --name sample-cpp-project --force && node ${workspaceFolder}/../../../packages/cli/dist/index.js index src && node ${workspaceFolder}/../../../packages/cli/dist/index.js stats",
+      "detail": "Run the full pipeline: initialize, index the codebase, and show stats",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "functionSearch",
+      "type": "promptString",
+      "description": "Search pattern for function names (e.g., 'publish', 'Router', 'send')"
+    },
+    {
+      "id": "discoverHint",
+      "type": "promptString",
+      "description": "Hint for scenario discovery (e.g., 'publishing a high-priority message')"
+    },
+    {
+      "id": "targetFunction",
+      "type": "promptString",
+      "description": "Function name (e.g., 'MessageBroker::publish', 'TcpTransport::send', 'route')"
+    },
+    {
+      "id": "scenarioId",
+      "type": "promptString",
+      "description": "Scenario ID (from 'List Scenarios' output)"
+    },
+    {
+      "id": "fromFunction",
+      "type": "promptString",
+      "description": "Source function name for path query"
+    },
+    {
+      "id": "toFunction",
+      "type": "promptString",
+      "description": "Target function name for path query"
+    },
+    {
+      "id": "exportFormat",
+      "type": "pickString",
+      "description": "Export format",
+      "options": ["json", "csv"],
+      "default": "json"
+    }
+  ]
+}
