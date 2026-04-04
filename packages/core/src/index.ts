@@ -20,6 +20,7 @@ export type {
   DispatchContext,
 } from './parser/interface.js';
 export { TypeScriptParser } from './parser/typescript.js';
+export { CppParser, type CppParserConfig } from './parser/cpp.js';
 
 // --- Graph Layer ---
 export { GraphDriver } from './graph/driver.js';
@@ -28,7 +29,8 @@ export { CodeIndexer } from './graph/indexer.js';
 export { QueryEngine } from './graph/queries.js';
 
 // --- AI Layer ---
-export { AIAgent, type AIProvider, type AIConfig } from './ai/agent.js';
+export { AIAgent, createAIProvider, type AIProvider, type AIConfig } from './ai/agent.js';
+export { CopilotCLIProvider, type CopilotCLIConfig } from './ai/copilot-cli-provider.js';
 export { ScenarioDiscoveryAgent } from './ai/scenario-discovery.js';
 export { PathTracerAgent } from './ai/path-tracer.js';
 export { VariableImaginerAgent } from './ai/variable-imaginer.js';
@@ -48,7 +50,7 @@ export {
 } from './correction/engine.js';
 
 // --- Config ---
-export { loadConfig, type CodeGraphConfig } from './config/loader.js';
+export { loadConfig, findProjectRoot, getCodeGraphDir, type CodeGraphConfig } from './config/loader.js';
 
 // --- Logger ---
 export { logger } from './config/logger.js';

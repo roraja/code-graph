@@ -33,7 +33,7 @@ const Neo4jConfigSchema = z.object({
 
 /** AI provider configuration */
 const AIConfigSchema = z.object({
-  provider: z.enum(['openai', 'mock']).default('mock'),
+  provider: z.enum(['openai', 'mock', 'copilot']).default('mock'),
   model: z.string().default('gpt-4-turbo'),
   apiKey: z.string().optional(),
   maxTokensPerRequest: z.number().default(120000),
@@ -80,51 +80,70 @@ export type CodeGraphConfig = z.infer<typeof CodeGraphConfigSchema>;
  * Substitute environment variable references in a string.
  * Replaces `${ENV_VAR_NAME}` with the value of the environment variable.
  */
-function substituteEnvVars(value: string): string {
+function substituteEnvVars(value: string, projectRoot?: string): string {
   return value.replace(/\$\{([^}]+)\}/g, (_, varName: string) => {
+    if (varName === 'workspaceFolder' && projectRoot) {
+      return projectRoot;
+    }
     return process.env[varName] ?? '';
   });
 }
 
 /** Recursively substitute env vars in all string values of an object */
-function substituteEnvVarsDeep(obj: unknown): unknown {
+function substituteEnvVarsDeep(obj: unknown, projectRoot?: string): unknown {
   if (typeof obj === 'string') {
-    return substituteEnvVars(obj);
+    return substituteEnvVars(obj, projectRoot);
   }
   if (Array.isArray(obj)) {
-    return obj.map(substituteEnvVarsDeep);
+    return obj.map(v => substituteEnvVarsDeep(v, projectRoot));
   }
   if (typeof obj === 'object' && obj !== null) {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
-      result[key] = substituteEnvVarsDeep(value);
+      result[key] = substituteEnvVarsDeep(value, projectRoot);
     }
     return result;
   }
   return obj;
 }
 
+/** The directory inside the target project where CodeGraph stores its files */
+const CODEGRAPH_DIR = '.vscode/code-graph';
+/** The config filename */
+const CONFIG_FILENAME = 'codegraph.yaml';
+
 /**
- * Load CodeGraph configuration from a `.codegraph.yaml` file.
+ * Load CodeGraph configuration from `.vscode/code-graph/codegraph.yaml`.
+ * Also checks the legacy location `.codegraph.yaml` for backwards compatibility.
  *
- * @param projectRoot - The directory to search for `.codegraph.yaml`.
+ * @param projectRoot - The directory to search for config.
  *                      Defaults to current working directory.
  * @returns Validated configuration object
  * @throws If the config file is missing or invalid
  */
 export function loadConfig(projectRoot?: string): CodeGraphConfig {
   const root = projectRoot ?? process.cwd();
-  const configPath = resolve(root, '.codegraph.yaml');
 
-  if (!existsSync(configPath)) {
+  // Primary location: .vscode/code-graph/codegraph.yaml
+  const primaryPath = resolve(root, CODEGRAPH_DIR, CONFIG_FILENAME);
+  // Legacy location: .codegraph.yaml
+  const legacyPath = resolve(root, '.codegraph.yaml');
+
+  let configPath: string;
+  if (existsSync(primaryPath)) {
+    configPath = primaryPath;
+  } else if (existsSync(legacyPath)) {
+    configPath = legacyPath;
+  } else {
     throw new Error(
-      `No .codegraph.yaml found in ${root}. Run 'codegraph init' to create one.`
+      `No codegraph.yaml found in ${root}. Run 'codegraph init' to create one.\n` +
+      `  Looked in: ${primaryPath}\n  Also tried: ${legacyPath}`
     );
   }
 
   const raw = readFileSync(configPath, 'utf-8');
   const parsed = parseYaml(raw);
-  const substituted = substituteEnvVarsDeep(parsed);
+  const substituted = substituteEnvVarsDeep(parsed, root);
   return CodeGraphConfigSchema.parse(substituted);
 }
 
@@ -156,15 +175,16 @@ export function serializeConfig(config: CodeGraphConfig): string {
 }
 
 /**
- * Find the project root by searching up for `.codegraph.yaml`.
- * Returns null if not found.
+ * Find the project root by searching up for `.vscode/code-graph/codegraph.yaml`
+ * or the legacy `.codegraph.yaml`. Returns null if not found.
  */
 export function findProjectRoot(startDir?: string): string | null {
   let dir = startDir ?? process.cwd();
   const root = '/';
 
   while (dir !== root) {
-    if (existsSync(resolve(dir, '.codegraph.yaml'))) {
+    if (existsSync(resolve(dir, CODEGRAPH_DIR, CONFIG_FILENAME)) ||
+        existsSync(resolve(dir, '.codegraph.yaml'))) {
       return dir;
     }
     const parent = dirname(dir);
@@ -173,4 +193,13 @@ export function findProjectRoot(startDir?: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Get the CodeGraph data directory path for a project.
+ * Returns `<projectRoot>/.vscode/code-graph/`.
+ */
+export function getCodeGraphDir(projectRoot?: string): string {
+  const root = projectRoot ?? process.cwd();
+  return resolve(root, CODEGRAPH_DIR);
 }

@@ -285,6 +285,7 @@ export class CodeIndexer {
 
   /**
    * Merges :CALLS relationship edges between :Function nodes.
+   * Matches callees by exact ID first, then by qualifiedName or name.
    */
   private async mergeCallEdges(
     tx: ManagedTransaction,
@@ -292,10 +293,45 @@ export class CodeIndexer {
   ): Promise<void> {
     if (calls.length === 0) return;
 
+    // Match by exact ID
     await tx.run(
       `UNWIND $calls AS call
        MATCH (caller:Function {id: call.callerId})
        MATCH (callee:Function {id: call.calleeId})
+       MERGE (caller)-[r:CALLS]->(callee)
+       SET r.filePath = call.filePath,
+           r.line = call.line,
+           r.column = call.column,
+           r.isVirtualDispatch = call.isVirtualDispatch,
+           r.callExpression = call.callExpression,
+           r.calleeName = call.calleeName`,
+      { calls }
+    );
+
+    // Match by qualifiedName (for cross-file calls where calleeId is a name)
+    await tx.run(
+      `UNWIND $calls AS call
+       MATCH (caller:Function {id: call.callerId})
+       MATCH (callee:Function)
+       WHERE callee.qualifiedName = call.calleeId OR callee.qualifiedName = call.calleeName
+       AND NOT EXISTS { (caller)-[:CALLS]->(callee) }
+       MERGE (caller)-[r:CALLS]->(callee)
+       SET r.filePath = call.filePath,
+           r.line = call.line,
+           r.column = call.column,
+           r.isVirtualDispatch = call.isVirtualDispatch,
+           r.callExpression = call.callExpression,
+           r.calleeName = call.calleeName`,
+      { calls }
+    );
+
+    // Match by simple name (fallback for unqualified calls)
+    await tx.run(
+      `UNWIND $calls AS call
+       MATCH (caller:Function {id: call.callerId})
+       MATCH (callee:Function)
+       WHERE callee.name = call.calleeName
+       AND NOT EXISTS { (caller)-[:CALLS]->(callee) }
        MERGE (caller)-[r:CALLS]->(callee)
        SET r.filePath = call.filePath,
            r.line = call.line,

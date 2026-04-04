@@ -11,7 +11,7 @@
 import { resolve } from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { TypeScriptParser, type ParseResult } from '@codegraph/core';
+import { TypeScriptParser, CppParser, type ParseResult, type ICodeParser } from '@codegraph/core';
 import {
   loadContext,
   handleError,
@@ -19,6 +19,17 @@ import {
   formatDuration,
   gracefulExit,
 } from '../helpers.js';
+
+/**
+ * Create the appropriate parser based on project language configuration.
+ */
+function createParser(languages: string[], parserConfig?: { cpp?: { compileCommands?: string; clangdPath?: string }; typescript?: { tsconfig?: string } }): ICodeParser {
+  const lang = languages[0] ?? 'ts';
+  if (lang === 'cpp' || lang === 'cc' || lang === 'cxx') {
+    return new CppParser(parserConfig?.cpp);
+  }
+  return new TypeScriptParser();
+}
 
 /**
  * Register the `index` command on the CLI program.
@@ -43,9 +54,9 @@ export function registerIndexCommand(program: Command): void {
         await ctx.schema.initialize();
         schemaSpinner.succeed('Graph schema ready');
 
-        // Parse the directory
+        // Parse the directory — select parser based on language
         const parseSpinner = startSpinner(`Parsing ${chalk.cyan(targetDir)}...`);
-        const parser = new TypeScriptParser();
+        const parser = createParser(ctx.config.project.languages, ctx.config.parser);
         const startTime = Date.now();
         const results = await parser.parseDirectory(targetDir, {
           exclude: ctx.config.project.excludeDirs,
@@ -68,12 +79,14 @@ export function registerIndexCommand(program: Command): void {
         const totalFunctions = results.reduce((sum: number, r: ParseResult) => sum + r.functions.length, 0);
         const totalClasses = results.reduce((sum: number, r: ParseResult) => sum + r.classes.length, 0);
         const totalCalls = results.reduce((sum: number, r: ParseResult) => sum + r.calls.length, 0);
+        const totalBranches = results.reduce((sum: number, r: ParseResult) => sum + r.branches.length, 0);
 
         console.log();
         console.log(chalk.green('✔ Indexing complete'));
         console.log(chalk.dim('  Functions: ') + chalk.white(String(totalFunctions)));
         console.log(chalk.dim('  Classes:   ') + chalk.white(String(totalClasses)));
         console.log(chalk.dim('  Call edges: ') + chalk.white(String(totalCalls)));
+        console.log(chalk.dim('  Branches:  ') + chalk.white(String(totalBranches)));
 
         await gracefulExit(ctx.driver, 0);
       } catch (err) {

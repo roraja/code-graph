@@ -46,9 +46,9 @@ export function registerDoctorCommand(program: Command): void {
       let config;
       try {
         config = loadConfig(configPath);
-        printCheck('pass', '.codegraph.yaml found');
+        printCheck('pass', 'codegraph.yaml found');
       } catch {
-        printCheck('fail', '.codegraph.yaml not found');
+        printCheck('fail', 'codegraph.yaml not found');
         console.log(
           chalk.dim('    Run ') +
             chalk.cyan('codegraph init') +
@@ -83,6 +83,13 @@ export function registerDoctorCommand(program: Command): void {
       if (config) {
         if (config.ai.provider === 'mock') {
           printCheck('pass', 'AI provider: mock (no API key needed)');
+        } else if (config.ai.provider === 'copilot') {
+          try {
+            execSync('copilot --version 2>/dev/null', { encoding: 'utf-8' });
+            printCheck('pass', 'AI provider: copilot (CLI found)');
+          } catch {
+            printCheck('warn', 'AI provider: copilot (CLI not found in PATH)');
+          }
         } else if (config.ai.apiKey && config.ai.apiKey.length > 0) {
           printCheck('pass', `AI provider: ${config.ai.provider} (API key configured)`);
         } else {
@@ -99,13 +106,30 @@ export function registerDoctorCommand(program: Command): void {
 
       // 5. clangd (for C++ projects)
       if (config?.project.languages.includes('cpp')) {
-        try {
-          const clangdVersion = execSync('clangd --version 2>/dev/null', {
-            encoding: 'utf-8',
-          }).trim().split('\n')[0];
-          printCheck('pass', `clangd: ${clangdVersion}`);
-        } catch {
+        // Try config path, then PATH, then common Chromium-bundled locations
+        const clangdPath = config.parser.cpp?.clangdPath ?? 'clangd';
+        const candidates = [
+          clangdPath,
+          'clangd',
+          'third_party/llvm-build/Release+Asserts/bin/clangd',
+        ];
+        let found = false;
+        for (const candidate of candidates) {
+          try {
+            const clangdVersion = execSync(`${candidate} --version 2>/dev/null`, {
+              encoding: 'utf-8',
+              cwd: process.cwd(),
+            }).trim().split('\n')[0];
+            printCheck('pass', `clangd: ${clangdVersion}`);
+            found = true;
+            break;
+          } catch {
+            // try next candidate
+          }
+        }
+        if (!found) {
           printCheck('warn', 'clangd not found (needed for C++ parsing)');
+          console.log(chalk.dim('    Set parser.cpp.clangdPath in .vscode/code-graph/codegraph.yaml'));
         }
       } else {
         printCheck('skip', 'clangd (not a C++ project)');

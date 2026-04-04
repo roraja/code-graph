@@ -7,11 +7,15 @@
  * @module cli/commands/init
  */
 
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { stringify as yamlStringify } from 'yaml';
+
+/** The directory inside the target project where CodeGraph stores its files */
+const CODEGRAPH_DIR = '.vscode/code-graph';
+const CONFIG_FILENAME = 'codegraph.yaml';
 
 /**
  * Register the `init` command on the CLI program.
@@ -25,13 +29,16 @@ export function registerInitCommand(program: Command): void {
     .option('--lang <language>', 'Primary language (ts or cpp)', 'ts')
     .option('--neo4j <uri>', 'Neo4j connection URI', 'bolt://localhost:7687')
     .option('--name <name>', 'Project name')
-    .option('-f, --force', 'Overwrite existing .codegraph.yaml')
+    .option('-f, --force', 'Overwrite existing config')
     .action(async (opts) => {
-      const configPath = resolve(process.cwd(), '.codegraph.yaml');
+      const codeGraphDir = resolve(process.cwd(), CODEGRAPH_DIR);
+      const configPath = resolve(codeGraphDir, CONFIG_FILENAME);
+      // Also check legacy location
+      const legacyPath = resolve(process.cwd(), '.codegraph.yaml');
 
-      if (existsSync(configPath) && !opts.force) {
+      if ((existsSync(configPath) || existsSync(legacyPath)) && !opts.force) {
         console.error(
-          chalk.red('✖ A .codegraph.yaml already exists.') +
+          chalk.red('✖ A codegraph.yaml already exists.') +
             chalk.dim(' Use --force to overwrite.')
         );
         process.exit(1);
@@ -44,9 +51,11 @@ export function registerInitCommand(program: Command): void {
       const config = buildDefaultConfig(projectName, language, neo4jUri);
       const yaml = yamlStringify(config, { indent: 2 });
 
+      // Ensure .vscode/code-graph/ directory exists
+      mkdirSync(codeGraphDir, { recursive: true });
       writeFileSync(configPath, yaml, 'utf-8');
 
-      console.log(chalk.green('✔ Created .codegraph.yaml'));
+      console.log(chalk.green(`✔ Created ${CODEGRAPH_DIR}/${CONFIG_FILENAME}`));
       console.log();
       console.log(chalk.dim('  Project: ') + chalk.white(projectName));
       console.log(chalk.dim('  Language: ') + chalk.white(language));

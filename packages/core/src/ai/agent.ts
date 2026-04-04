@@ -17,7 +17,7 @@ import OpenAI from 'openai';
 /** Configuration for creating an AI provider. */
 export interface AIConfig {
   /** Which provider backend to use. `'mock'` requires no API key. */
-  provider: 'openai' | 'mock';
+  provider: 'openai' | 'mock' | 'copilot';
   /** Model identifier, e.g. `'gpt-4-turbo'`. */
   model: string;
   /** API key for the provider (not required for `'mock'`). */
@@ -317,6 +317,8 @@ export class AIAgent {
 }
 
 // ---------------------------------------------------------------------------
+import { CopilotCLIProvider } from './copilot-cli-provider.js';
+
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -332,6 +334,8 @@ export function createAIProvider(config: AIConfig): AIProvider {
       return new OpenAIProvider(config);
     case 'mock':
       return new MockAIProvider();
+    case 'copilot':
+      return new CopilotCLIProvider();
     default:
       throw new Error(`Unknown AI provider: ${String((config as AIConfig).provider)}`);
   }
