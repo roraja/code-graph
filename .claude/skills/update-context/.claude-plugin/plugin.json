@@ -1,0 +1,5 @@
+{
+  "name": "update-context",
+  "version": "1.0.0",
+  "description": "Walk through the codebase and update all context files (.context/FLOORPLAN.md and .context/domains/*.md) to reflect the current state of the code."
+}

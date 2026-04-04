@@ -30,6 +30,7 @@ Thumbs.db
 # === Logs ===
 *.log
 npm-debug.log*
+logs/
 
 # === Neo4j local data ===
 neo4j-data/
