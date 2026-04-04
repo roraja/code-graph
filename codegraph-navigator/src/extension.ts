@@ -8,7 +8,7 @@
  * Architecture:
  *   - @codegraph/core is a direct npm dependency (monorepo workspace).
  *   - All data comes from the core-bridge which calls CodeGraphClient.
- *   - Three sidebar views: Scenarios, Step Walker, Functions.
+ *   - Four sidebar views: Scenarios, Step Walker, Step Detail (webview), Functions.
  *   - Editor context menu: right-click a function name to find scenarios
  *     or discover new scenarios starting from it.
  *   - Logs: .vscode/code-graph/logs/<YYYY-MM-DD>.log
@@ -21,6 +21,7 @@ import { initLogger, log, logEntry, logExit, logError, disposeLogger, showOutput
 import * as coreBridge from './core-bridge.js';
 import { ScenariosProvider } from './providers/scenarios.js';
 import { StepWalkerProvider } from './providers/step-walker.js';
+import { StepDetailViewProvider } from './providers/step-detail-view.js';
 import { FunctionsProvider } from './providers/functions.js';
 import { openStepInEditor } from './decorations.js';
 import type { ScenarioStep, CallRelation } from '@codegraph/core';
@@ -52,6 +53,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // --- Providers ---
   const scenariosProvider = new ScenariosProvider();
   const stepWalkerProvider = new StepWalkerProvider();
+  const stepDetailViewProvider = new StepDetailViewProvider();
   const functionsProvider = new FunctionsProvider();
 
   // Register tree data providers
@@ -62,6 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     scenariosTreeView,
     vscode.window.registerTreeDataProvider('codegraph.stepWalker', stepWalkerProvider),
+    vscode.window.registerWebviewViewProvider(StepDetailViewProvider.viewType, stepDetailViewProvider),
     vscode.window.registerTreeDataProvider('codegraph.functions', functionsProvider)
   );
 
@@ -115,9 +118,9 @@ export function activate(context: vscode.ExtensionContext): void {
             placeHolder: 'e.g., user-login-flow',
           });
           if (!input) { logExit('cmd:viewScenario', 'cancelled'); return; }
-          await loadAndWalk(input, scenariosProvider, stepWalkerProvider);
+          await loadAndWalk(input, scenariosProvider, stepWalkerProvider, stepDetailViewProvider);
         } else {
-          await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider);
+          await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider, stepDetailViewProvider);
         }
         logExit('cmd:viewScenario');
       } catch (err) {
@@ -135,7 +138,7 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         const scenarioId = node?.scenario?.id;
         if (!scenarioId) { logExit('cmd:walkScenario', 'no scenarioId'); return; }
-        await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider);
+        await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider, stepDetailViewProvider);
         logExit('cmd:walkScenario');
       } catch (err) {
         logError('cmd:walkScenario', err);
@@ -150,7 +153,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('codegraph.nextStep', () => {
       logEntry('cmd:nextStep');
       stepWalkerProvider.nextStep();
-      autoOpenCurrentStep(stepWalkerProvider, workspaceRoot);
+      autoOpenCurrentStep(stepWalkerProvider, stepDetailViewProvider, workspaceRoot);
       logExit('cmd:nextStep');
     })
   );
@@ -161,7 +164,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('codegraph.prevStep', () => {
       logEntry('cmd:prevStep');
       stepWalkerProvider.prevStep();
-      autoOpenCurrentStep(stepWalkerProvider, workspaceRoot);
+      autoOpenCurrentStep(stepWalkerProvider, stepDetailViewProvider, workspaceRoot);
       logExit('cmd:prevStep');
     })
   );
@@ -234,9 +237,9 @@ export function activate(context: vscode.ExtensionContext): void {
             placeHolder: 'e.g., user-login-flow',
           });
           if (!input) { logExit('cmd:traceScenario', 'cancelled'); return; }
-          await runTrace(input, input, scenariosProvider, stepWalkerProvider);
+          await runTrace(input, input, scenariosProvider, stepWalkerProvider, stepDetailViewProvider);
         } else {
-          await runTrace(scenarioId, scenarioName, scenariosProvider, stepWalkerProvider);
+          await runTrace(scenarioId, scenarioName, scenariosProvider, stepWalkerProvider, stepDetailViewProvider);
         }
         logExit('cmd:traceScenario');
       } catch (err) {
@@ -275,7 +278,7 @@ export function activate(context: vscode.ExtensionContext): void {
               { placeHolder: 'Select a scenario to walk' }
             );
             if (picked) {
-              await loadAndWalk(picked.id, scenariosProvider, stepWalkerProvider);
+              await loadAndWalk(picked.id, scenariosProvider, stepWalkerProvider, stepDetailViewProvider);
             }
           }
         );
@@ -345,7 +348,7 @@ export function activate(context: vscode.ExtensionContext): void {
               { placeHolder: 'Select a scenario to walk' }
             );
             if (picked) {
-              await loadAndWalk(picked.id, scenariosProvider, stepWalkerProvider);
+              await loadAndWalk(picked.id, scenariosProvider, stepWalkerProvider, stepDetailViewProvider);
             }
           }
         );
@@ -486,7 +489,8 @@ async function runTrace(
   scenarioId: string,
   scenarioName: string,
   scenariosProvider: ScenariosProvider,
-  stepWalkerProvider: StepWalkerProvider
+  stepWalkerProvider: StepWalkerProvider,
+  stepDetailViewProvider: StepDetailViewProvider
 ): Promise<void> {
   logEntry('runTrace', { scenarioId });
 
@@ -512,19 +516,20 @@ async function runTrace(
 
       // Refresh the scenarios tree and reload the traced scenario in the walker
       scenariosProvider.refresh();
-      await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider);
+      await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider, stepDetailViewProvider);
     }
   );
   logExit('runTrace');
 }
 
 /**
- * Load a scenario and display it in the Step Walker.
+ * Load a scenario and display it in the Step Walker + Step Detail.
  */
 async function loadAndWalk(
   scenarioId: string,
   scenariosProvider: ScenariosProvider,
-  stepWalkerProvider: StepWalkerProvider
+  stepWalkerProvider: StepWalkerProvider,
+  stepDetailViewProvider: StepDetailViewProvider
 ): Promise<void> {
   logEntry('loadAndWalk', { scenarioId });
 
@@ -544,11 +549,12 @@ async function loadAndWalk(
       // Focus the step walker view
       await vscode.commands.executeCommand('codegraph.stepWalker.focus');
 
-      // Auto-open the first step
+      // Auto-open the first step and show detail
       const firstStep = stepWalkerProvider.getCurrentStep();
       if (firstStep) {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         await openStepInEditor(firstStep, workspaceRoot, view.steps);
+        stepDetailViewProvider.showStep(firstStep, view);
       }
     }
   );
@@ -556,10 +562,11 @@ async function loadAndWalk(
 }
 
 /**
- * Auto-open the current step in the editor when navigating.
+ * Auto-open the current step in the editor and update the detail view.
  */
 function autoOpenCurrentStep(
   stepWalkerProvider: StepWalkerProvider,
+  stepDetailViewProvider: StepDetailViewProvider,
   workspaceRoot: string | undefined
 ): void {
   logEntry('autoOpenCurrentStep');
@@ -568,6 +575,7 @@ function autoOpenCurrentStep(
     log('debug', 'autoOpenCurrentStep: opening step', { stepNumber: step.stepNumber, functionName: step.functionName });
     const scenarioView = stepWalkerProvider.getScenarioView();
     openStepInEditor(step, workspaceRoot, scenarioView?.steps);
+    stepDetailViewProvider.showStep(step, scenarioView);
   } else {
     log('debug', 'autoOpenCurrentStep: no current step');
   }

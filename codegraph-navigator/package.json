@@ -40,6 +40,11 @@
           "name": "Step Walker"
         },
         {
+          "id": "codegraph.stepDetail",
+          "name": "Step Detail",
+          "type": "webview"
+        },
+        {
           "id": "codegraph.functions",
           "name": "Functions"
         }
