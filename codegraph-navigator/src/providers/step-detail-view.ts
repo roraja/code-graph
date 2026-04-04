@@ -11,7 +11,7 @@
 
 import * as vscode from 'vscode';
 import { log, logEntry, logExit } from '../logger.js';
-import type { ScenarioStep, ScenarioView } from '@codegraph/core';
+import type { ScenarioStep, ScenarioView, CallStackFrame } from '@codegraph/core';
 
 /**
  * Webview provider that renders full step detail in the sidebar.
@@ -32,8 +32,21 @@ export class StepDetailViewProvider implements vscode.WebviewViewProvider {
     this.view = webviewView;
 
     webviewView.webview.options = {
-      enableScripts: false,
+      enableScripts: true,
     };
+
+    // Handle messages from the webview (e.g., clicking a call stack frame)
+    webviewView.webview.onDidReceiveMessage((message) => {
+      if (message.type === 'openFrame') {
+        const frame = message.frame as CallStackFrame;
+        log('debug', 'StepDetailViewProvider: openFrame message received', {
+          functionName: frame.functionName,
+          filePath: frame.filePath,
+          line: frame.line,
+        });
+        vscode.commands.executeCommand('codegraph.openCallStackFrame', frame);
+      }
+    });
 
     this.render();
     logExit('StepDetailViewProvider.resolveWebviewView');
@@ -142,6 +155,32 @@ export class StepDetailViewProvider implements vscode.WebviewViewProvider {
       </section>`;
     }
 
+    // Build call stack HTML
+    let callStackHtml = '';
+    if (step.callStack && step.callStack.length > 0) {
+      const frames = step.callStack
+        .slice()
+        .reverse()
+        .map((frame, idx) => {
+          const isTopFrame = idx === 0;
+          const frameClass = isTopFrame ? 'frame frame-current' : 'frame';
+          const depthIndicator = isTopFrame ? '▸ ' : '  ';
+          const fileName = frame.filePath.split('/').pop() ?? frame.filePath;
+          const frameJson = escapeHtml(JSON.stringify(frame));
+          return `<div class="${frameClass}" data-frame="${frameJson}" title="Click to open ${escapeHtml(frame.filePath)}:${frame.line}">
+            <span class="frame-icon">${depthIndicator}</span>
+            <span class="frame-name">${escapeHtml(frame.functionName)}</span>
+            <span class="frame-location">${escapeHtml(fileName)}:${frame.line}</span>
+          </div>`;
+        })
+        .join('\n');
+      callStackHtml = `
+      <section class="section callstack-section">
+        <h3>Call Stack</h3>
+        <div class="callstack">${frames}</div>
+      </section>`;
+    }
+
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -167,7 +206,27 @@ export class StepDetailViewProvider implements vscode.WebviewViewProvider {
   </section>
 
   ${variablesHtml}
+  ${callStackHtml}
   ${correctionHtml}
+
+  <script>
+    (function() {
+      const vscode = acquireVsCodeApi();
+      document.querySelectorAll('.frame').forEach(el => {
+        el.addEventListener('click', () => {
+          const frameData = el.getAttribute('data-frame');
+          if (frameData) {
+            try {
+              const frame = JSON.parse(frameData);
+              vscode.postMessage({ type: 'openFrame', frame });
+            } catch (e) {
+              console.error('Failed to parse frame data', e);
+            }
+          }
+        });
+      });
+    })();
+  </script>
 </body>
 </html>`;
   }
@@ -366,6 +425,56 @@ export class StepDetailViewProvider implements vscode.WebviewViewProvider {
         font-size: 12px;
         font-style: italic;
         color: var(--muted);
+      }
+
+      .callstack-section {
+        margin-bottom: 14px;
+      }
+
+      .callstack {
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 12px;
+      }
+
+      .frame {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        padding: 4px 8px;
+        cursor: pointer;
+        border-radius: 3px;
+        border-left: 3px solid transparent;
+        transition: background 0.1s;
+      }
+
+      .frame:hover {
+        background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.12));
+      }
+
+      .frame-current {
+        background: var(--vscode-list-activeSelectionBackground, rgba(0,120,215,0.15));
+        border-left-color: var(--blue);
+        font-weight: 600;
+      }
+
+      .frame-icon {
+        flex-shrink: 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .frame-name {
+        color: var(--link);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .frame-location {
+        color: var(--muted);
+        font-size: 11px;
+        white-space: nowrap;
+        margin-left: auto;
       }
     `;
   }

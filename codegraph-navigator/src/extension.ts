@@ -24,7 +24,7 @@ import { StepWalkerProvider } from './providers/step-walker.js';
 import { StepDetailViewProvider } from './providers/step-detail-view.js';
 import { FunctionsProvider } from './providers/functions.js';
 import { openStepInEditor } from './decorations.js';
-import type { ScenarioStep, CallRelation } from '@codegraph/core';
+import type { ScenarioStep, CallRelation, CallStackFrame } from '@codegraph/core';
 
 export function activate(context: vscode.ExtensionContext): void {
   logEntry('activate', { extensionVersion: context.extension.packageJSON?.version });
@@ -293,6 +293,43 @@ export function activate(context: vscode.ExtensionContext): void {
       } catch (err) {
         logError('cmd:openStepInEditor', err);
         throw err;
+      }
+    })
+  );
+
+  // Open call stack frame in editor (navigate to a specific stack frame)
+  log('debug', 'Registering command: codegraph.openCallStackFrame');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.openCallStackFrame', async (frame: CallStackFrame) => {
+      logEntry('cmd:openCallStackFrame', {
+        functionName: frame?.functionName,
+        filePath: frame?.filePath,
+        line: frame?.line,
+      });
+      try {
+        if (!frame || !frame.filePath) {
+          logExit('cmd:openCallStackFrame', 'no frame');
+          return;
+        }
+
+        // Resolve the file path (may be relative to workspace)
+        let filePath = frame.filePath;
+        if (!filePath.startsWith('/') && workspaceRoot) {
+          const path = await import('node:path');
+          filePath = path.join(workspaceRoot, filePath);
+        }
+
+        const uri = vscode.Uri.file(filePath);
+        const line = Math.max(0, frame.line - 1);
+        await vscode.window.showTextDocument(uri, {
+          selection: new vscode.Range(line, 0, line, 0),
+          preview: false,
+        });
+        logExit('cmd:openCallStackFrame');
+      } catch (err) {
+        logError('cmd:openCallStackFrame', err);
+        const message = err instanceof Error ? err.message : String(err);
+        vscode.window.showErrorMessage(`CodeGraph: Could not open file — ${message}`);
       }
     })
   );

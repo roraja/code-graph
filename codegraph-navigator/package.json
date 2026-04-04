@@ -88,6 +88,10 @@
         "title": "CodeGraph: Open Step in Editor"
       },
       {
+        "command": "codegraph.openCallStackFrame",
+        "title": "CodeGraph: Open Call Stack Frame in Editor"
+      },
+      {
         "command": "codegraph.refreshFunctions",
         "title": "CodeGraph: Refresh Functions",
         "icon": "$(refresh)"
