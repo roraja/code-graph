@@ -5,6 +5,11 @@
  * saves them to the graph, then automatically traces each scenario to
  * generate step-by-step execution data.
  *
+ * When `--function <name>` is provided, discovers scenarios that *involve*
+ * that function — not necessarily starting from it. The function can appear
+ * anywhere in the execution path. Callers and callees of the target are
+ * gathered from the graph to give the AI upstream/downstream context.
+ *
  * When the AI provider is the Copilot CLI, the prompt is kept minimal
  * (just the user hint and function names) so copilot can search the
  * codebase itself using its tools. Function source code is NOT embedded
@@ -16,6 +21,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import Table from 'cli-table3';
+import type { FunctionSummary, ScenarioDiscoveryInput } from '@codegraph/core';
 import {
   loadFullContext,
   handleError,
@@ -50,6 +56,46 @@ function extractFunctionNameFromHint(hint: string): string | null {
 }
 
 /**
+ * Convert a graph FunctionNode to the lightweight FunctionSummary shape
+ * used by the discovery agent.
+ */
+function toFunctionSummary(f: {
+  id: string;
+  name: string;
+  qualifiedName?: string;
+  signature: string;
+  filePath: string;
+  startLine?: number;
+  endLine?: number;
+  returnType?: string;
+  visibility?: string;
+  language?: string;
+  documentation?: string;
+  sourceCode?: string;
+  isAsync?: boolean;
+  isAbstract?: boolean;
+  parameters?: Array<{ name: string; type: string; isOptional: boolean; defaultValue?: string }>;
+}): FunctionSummary {
+  return {
+    id: f.id,
+    name: f.qualifiedName || f.name,
+    qualifiedName: f.qualifiedName,
+    signature: f.signature,
+    filePath: f.filePath,
+    startLine: f.startLine,
+    endLine: f.endLine,
+    returnType: f.returnType,
+    visibility: f.visibility,
+    language: f.language,
+    documentation: f.documentation,
+    sourceCode: f.sourceCode,
+    isAsync: f.isAsync,
+    isAbstract: f.isAbstract,
+    parameters: f.parameters,
+  };
+}
+
+/**
  * Register the `discover` command on the CLI program.
  *
  * @param program - The root Commander program instance
@@ -59,6 +105,10 @@ export function registerDiscoverCommand(program: Command): void {
     .command('discover')
     .description('Discover scenarios in the indexed codebase')
     .option('--hint <text>', 'Provide a hint to guide discovery')
+    .option(
+      '--function <name>',
+      'Discover scenarios that involve (call) this function, not just ones starting from it',
+    )
     .option('--count <n>', 'Maximum number of scenarios to discover', '5')
     .option('--no-trace', 'Skip automatic tracing of discovered scenarios')
     .action(async (opts, cmd) => {
@@ -68,7 +118,13 @@ export function registerDiscoverCommand(program: Command): void {
       try {
         const ctx = await loadFullContext(configPath);
 
-        const spinner = startSpinner('Analyzing codebase for scenarios...');
+        const targetFunctionName: string | undefined = opts.function;
+        const isTargetMode = !!targetFunctionName;
+
+        const spinnerText = isTargetMode
+          ? `Finding scenarios involving "${targetFunctionName}"...`
+          : 'Analyzing codebase for scenarios...';
+        const spinner = startSpinner(spinnerText);
 
         // Build a lightweight list of function names from the graph.
         // We do NOT include source code or full details — the AI provider
@@ -97,26 +153,69 @@ export function registerDiscoverCommand(program: Command): void {
 
         // Send minimal function info: name, signature, file path only.
         // No source code — copilot reads files directly.
-        const entryPoints = mergedFunctions.map((f) => ({
-          id: f.id,
-          name: f.qualifiedName || f.name,
-          signature: f.signature,
-          filePath: f.filePath,
-        }));
+        const entryPoints = mergedFunctions.map((f) => toFunctionSummary(f));
 
-        const scenarios = await ctx.discoveryAgent.discover({
+        // Build the discovery input
+        const discoveryInput: ScenarioDiscoveryInput = {
           entryPoints,
           eventHandlers: [],
           publicAPIs: entryPoints,
           userHint: opts.hint,
-        });
+        };
 
+        // --function mode: find the target, its callers, and callees
+        if (isTargetMode) {
+          // Resolve the target function from the graph
+          const targetFunc =
+            (await ctx.queryEngine.getFunctionByName(targetFunctionName)) ??
+            mergedFunctions.find(
+              (f) =>
+                f.name === targetFunctionName ||
+                f.qualifiedName === targetFunctionName ||
+                f.qualifiedName?.endsWith(`::${targetFunctionName}`) ||
+                f.qualifiedName?.endsWith(`.${targetFunctionName}`) ||
+                f.name.includes(targetFunctionName) ||
+                f.qualifiedName?.includes(targetFunctionName),
+            );
+
+          if (!targetFunc) {
+            spinner.fail(
+              `Function "${targetFunctionName}" not found in the graph. ` +
+              `Try running ${chalk.cyan('codegraph index')} first.`,
+            );
+            await gracefulExit(ctx.driver, 1);
+            return;
+          }
+
+          discoveryInput.targetFunction = toFunctionSummary(targetFunc);
+
+          // Gather callers (upstream context)
+          const callerRelations = await ctx.queryEngine.getCallers(targetFunc.id);
+          discoveryInput.targetCallers = callerRelations.map((r) =>
+            toFunctionSummary(r.function),
+          );
+
+          // Gather callees (downstream context)
+          const calleeRelations = await ctx.queryEngine.getCallees(targetFunc.id);
+          discoveryInput.targetCallees = calleeRelations.map((r) =>
+            toFunctionSummary(r.function),
+          );
+        }
+
+        const scenarios = await ctx.discoveryAgent.discover(discoveryInput);
+
+        const targetLabel = isTargetMode
+          ? ` involving ${chalk.cyan(targetFunctionName)}`
+          : '';
         spinner.succeed(
-          `Discovered ${chalk.bold(String(scenarios.length))} scenarios`
+          `Discovered ${chalk.bold(String(scenarios.length))} scenarios${targetLabel}`
         );
 
         if (scenarios.length === 0) {
-          console.log(chalk.yellow('  No scenarios found. Try adding a --hint.'));
+          const tip = isTargetMode
+            ? `  No scenarios found involving "${targetFunctionName}". Try adding a --hint.`
+            : '  No scenarios found. Try adding a --hint.';
+          console.log(chalk.yellow(tip));
           await gracefulExit(ctx.driver, 0);
           return;
         }
@@ -182,7 +281,11 @@ export function registerDiscoverCommand(program: Command): void {
 
         // Display table
         console.log();
-        printHeader('Discovered Scenarios');
+        printHeader(
+          isTargetMode
+            ? `Scenarios Involving ${targetFunctionName}`
+            : 'Discovered Scenarios',
+        );
         const table = new Table({
           head: [
             chalk.cyan('Name'),

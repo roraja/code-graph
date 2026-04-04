@@ -19,7 +19,7 @@ import { QueryEngine, type CallRelation } from './graph/queries.js';
 import { ScenarioEngine, type Scenario, type ScenarioStep, type CreateScenarioInput } from './scenario/engine.js';
 import { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
 import { CorrectionEngine, type Correction, type StructuredCorrection } from './correction/engine.js';
-import { ScenarioDiscoveryAgent, type DiscoveredScenario } from './ai/scenario-discovery.js';
+import { ScenarioDiscoveryAgent, type DiscoveredScenario, type ScenarioDiscoveryInput } from './ai/scenario-discovery.js';
 import { PathTracerAgent } from './ai/path-tracer.js';
 import { VariableImaginerAgent } from './ai/variable-imaginer.js';
 import { JustifierAgent } from './ai/justifier.js';
@@ -680,16 +680,27 @@ export class CodeGraphClient {
   // -----------------------------------------------------------------------
 
   /**
-   * Use AI to discover new scenarios starting from a function.
+   * Use AI to discover new scenarios involving a function.
+   *
+   * By default (`mode: 'involving'`), discovers scenarios where the function
+   * appears **anywhere** in the execution path — as the entry point, a direct
+   * callee, or a deeply-nested helper. Callers and callees of the target are
+   * gathered from the graph to give the AI upstream/downstream context.
+   *
+   * With `mode: 'starting'`, discovers scenarios that **start from** the
+   * function (the original behaviour).
+   *
    * After discovery, each scenario is automatically traced to generate steps.
    *
    * @param functionName - Function name / hint for the discovery agent
    * @param count - Maximum scenarios to discover (default 3)
+   * @param mode - Discovery mode: 'involving' (default) or 'starting'
    * @returns The discovered scenarios (also saved to the graph with traced steps)
    */
   async discoverFromFunction(
     functionName: string,
     count = 3,
+    mode: 'involving' | 'starting' = 'involving',
   ): Promise<DiscoveredScenario[]> {
     if (this.isMock) {
       return []; // No AI in mock mode
@@ -715,7 +726,7 @@ export class CodeGraphClient {
         sourceCode: f.sourceCode,
       }));
 
-    // Find the target function to build a rich hint with file/line context
+    // Find the target function in the graph
     const targetFunc = functions.find(
       (f) =>
         f.name === functionName ||
@@ -724,48 +735,103 @@ export class CodeGraphClient {
         f.qualifiedName.endsWith(`.${functionName}`),
     );
 
-    let userHint: string;
-    if (targetFunc) {
-      userHint = [
-        `Focus on scenarios starting from the function "${targetFunc.qualifiedName}".`,
-        `File: ${targetFunc.filePath}`,
-        `Lines: ${targetFunc.startLine}–${targetFunc.endLine}`,
-        `Signature: ${targetFunc.signature}`,
-        targetFunc.returnType ? `Returns: ${targetFunc.returnType}` : '',
-        targetFunc.documentation ? `Documentation: ${targetFunc.documentation}` : '',
-        targetFunc.sourceCode
-          ? `Source code:\n${targetFunc.sourceCode.slice(0, 1000)}`
-          : '',
-      ]
-        .filter(Boolean)
-        .join('\n');
+    const input: ScenarioDiscoveryInput = {
+      entryPoints,
+      eventHandlers: [],
+      publicAPIs: entryPoints,
+    };
+
+    if (mode === 'involving' && targetFunc) {
+      // "Involving" mode: set targetFunction + callers/callees for rich context
+      input.targetFunction = {
+        id: targetFunc.id,
+        name: targetFunc.name,
+        qualifiedName: targetFunc.qualifiedName,
+        signature: targetFunc.signature,
+        filePath: targetFunc.filePath,
+        startLine: targetFunc.startLine,
+        endLine: targetFunc.endLine,
+        returnType: targetFunc.returnType,
+        visibility: targetFunc.visibility,
+        language: targetFunc.language,
+        documentation: targetFunc.documentation,
+        sourceCode: targetFunc.sourceCode,
+        isAsync: targetFunc.isAsync,
+        isAbstract: targetFunc.isAbstract,
+      };
+
+      // Gather callers (upstream context)
+      const callerRelations = await this.queryEngine!.getCallers(targetFunc.id);
+      input.targetCallers = callerRelations.map((r) => ({
+        id: r.function.id,
+        name: r.function.name,
+        qualifiedName: r.function.qualifiedName,
+        signature: r.function.signature,
+        filePath: r.function.filePath,
+        startLine: r.function.startLine,
+        endLine: r.function.endLine,
+        returnType: r.function.returnType,
+        visibility: r.function.visibility,
+        language: r.function.language,
+        documentation: r.function.documentation,
+        sourceCode: r.function.sourceCode,
+      }));
+
+      // Gather callees (downstream context)
+      const calleeRelations = await this.queryEngine!.getCallees(targetFunc.id);
+      input.targetCallees = calleeRelations.map((r) => ({
+        id: r.function.id,
+        name: r.function.name,
+        qualifiedName: r.function.qualifiedName,
+        signature: r.function.signature,
+        filePath: r.function.filePath,
+        startLine: r.function.startLine,
+        endLine: r.function.endLine,
+        returnType: r.function.returnType,
+        visibility: r.function.visibility,
+        language: r.function.language,
+        documentation: r.function.documentation,
+        sourceCode: r.function.sourceCode,
+      }));
     } else {
-      // No exact match — try a partial/substring match for extra context
-      const partialMatch = functions.find(
-        (f) =>
-          f.name.includes(functionName) ||
-          f.qualifiedName.includes(functionName),
-      );
-      if (partialMatch) {
-        userHint = [
-          `Focus on scenarios starting from "${functionName}" (closest match: "${partialMatch.qualifiedName}").`,
-          `File: ${partialMatch.filePath}`,
-          `Lines: ${partialMatch.startLine}–${partialMatch.endLine}`,
-          partialMatch.signature ? `Signature: ${partialMatch.signature}` : '',
+      // "Starting" mode (legacy): use a userHint to guide the AI
+      if (targetFunc) {
+        input.userHint = [
+          `Focus on scenarios starting from the function "${targetFunc.qualifiedName}".`,
+          `File: ${targetFunc.filePath}`,
+          `Lines: ${targetFunc.startLine}–${targetFunc.endLine}`,
+          `Signature: ${targetFunc.signature}`,
+          targetFunc.returnType ? `Returns: ${targetFunc.returnType}` : '',
+          targetFunc.documentation ? `Documentation: ${targetFunc.documentation}` : '',
+          targetFunc.sourceCode
+            ? `Source code:\n${targetFunc.sourceCode.slice(0, 1000)}`
+            : '',
         ]
           .filter(Boolean)
           .join('\n');
       } else {
-        userHint = `Focus on scenarios starting from "${functionName}" (not found in the graph — name may be approximate).`;
+        // No exact match — try a partial/substring match for extra context
+        const partialMatch = functions.find(
+          (f) =>
+            f.name.includes(functionName) ||
+            f.qualifiedName.includes(functionName),
+        );
+        if (partialMatch) {
+          input.userHint = [
+            `Focus on scenarios starting from "${functionName}" (closest match: "${partialMatch.qualifiedName}").`,
+            `File: ${partialMatch.filePath}`,
+            `Lines: ${partialMatch.startLine}–${partialMatch.endLine}`,
+            partialMatch.signature ? `Signature: ${partialMatch.signature}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n');
+        } else {
+          input.userHint = `Focus on scenarios starting from "${functionName}" (not found in the graph — name may be approximate).`;
+        }
       }
     }
 
-    const scenarios = await this.discoveryAgent!.discover({
-      entryPoints,
-      eventHandlers: [],
-      publicAPIs: entryPoints,
-      userHint,
-    });
+    const scenarios = await this.discoveryAgent!.discover(input);
 
     // Save discovered scenarios and trace each one
     const saved = scenarios.slice(0, count);
