@@ -55,6 +55,8 @@ correction/    ← CorrectionEngine (natural-language → structured rules → r
 | **Config** | |
 | `src/config/loader.ts` | `loadConfig(projectRoot?)` — loads from `.vscode/code-graph/codegraph.yaml` (primary) or `.codegraph.yaml` (legacy). Zod validation + `${ENV_VAR}` substitution. `findProjectRoot()`, `getCodeGraphDir()`, `createDefaultConfig()`, `serializeConfig()`. `CodeGraphConfig` type |
 | `src/config/logger.ts` | Winston logger singleton (`logger`) + `createModuleLogger(moduleName)` child logger factory |
+| **Public API** | |
+| `src/api.ts` | High-level facade. `CodeGraphClient` class wraps all core engines (GraphDriver, GraphSchema, CodeIndexer, QueryEngine, ScenarioEngine, ScenarioTracer, CorrectionEngine, all AI agents) behind a unified API. `createCodeGraphClient(options?)` factory. `CodeGraphClientOptions` interface (`projectRoot?`, `mock?`). `ScenarioView` type (`{ scenario, steps }`). `FunctionInfo` type alias for `FunctionNode`. Includes built-in mock/demo data for offline mode |
 
 ## Patterns
 
@@ -64,7 +66,8 @@ correction/    ← CorrectionEngine (natural-language → structured rules → r
 - **AI agent base class**: All specialized agents extend `AIAgent` which provides `chat()` and `chatJSON()` methods
 - **Scenario steps**: Each `ScenarioStep` has `action` (call, branch_taken, branch_skipped, dispatch, return, assign), justification, variable state, and confidence score
 - **Module loggers**: Every module creates its own logger: `const log = createModuleLogger('parser')`
-- **Config locations**: Primary path `.vscode/code-graph/codegraph.yaml`, legacy `.codegraph.yaml`. Config schema supports `project`, `neo4j`, `parser` (cpp/typescript), `ai` (provider: openai/mock/copilot), `tracing`, `server` sections
+- **Config locations**: Primary path `.vscode/code-graph/codegraph.yaml`, legacy `.codegraph.yaml`. Config schema supports `project`, `neo4j`, `parser` (cpp/typescript), `ai` (provider: openai/mock/copilot, default: copilot), `tracing`, `server`, `editor` (sshHost) sections
+- **Public API facade**: `CodeGraphClient` in `src/api.ts` provides a high-level entry point used by the VS Code extension and other consumers. Wraps engine construction and connection lifecycle. Supports mock mode with built-in demo data
 
 ## Adding New Functionality
 
@@ -74,4 +77,5 @@ correction/    ← CorrectionEngine (natural-language → structured rules → r
 - **New graph query**: Add typed method to `QueryEngine` in `src/graph/queries.ts`
 - **New correction type**: Add to `CorrectionType` union in `src/correction/engine.ts`, handle in `applyCorrection()` switch
 - **New config section**: Add Zod schema in `src/config/loader.ts`, add to `CodeGraphConfigSchema`
+- **New public API method**: Add to `CodeGraphClient` in `src/api.ts` if consumers need access
 - **Always**: Re-export from `src/index.ts`

@@ -32,6 +32,16 @@ export { QueryEngine } from './graph/queries.js';
 export { AIAgent, createAIProvider, type AIProvider, type AIConfig } from './ai/agent.js';
 export { CopilotCLIProvider, type CopilotCLIConfig } from './ai/copilot-cli-provider.js';
 export { ScenarioDiscoveryAgent } from './ai/scenario-discovery.js';
+export type {
+  FunctionSummary,
+  ScenarioDiscoveryInput,
+  DiscoveredScenario,
+  CallEdgeSummary,
+  BranchSummary,
+  ClassSummary,
+  InheritanceSummary,
+  CodebaseSummary,
+} from './ai/scenario-discovery.js';
 export { PathTracerAgent } from './ai/path-tracer.js';
 export { VariableImaginerAgent } from './ai/variable-imaginer.js';
 export { JustifierAgent } from './ai/justifier.js';
@@ -39,7 +49,7 @@ export { CorrectionInterpreterAgent } from './ai/correction-interpreter.js';
 
 // --- Scenario Layer ---
 export { ScenarioEngine, type Scenario, type ScenarioStep } from './scenario/engine.js';
-export { ScenarioTracer, type TraceConfig } from './scenario/tracer.js';
+export { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
 
 // --- Correction Layer ---
 export {

@@ -17,7 +17,7 @@
  */
 
 import * as vscode from 'vscode';
-import { initLogger, log, disposeLogger, showOutputChannel } from './logger.js';
+import { initLogger, log, logEntry, logExit, logError, disposeLogger, showOutputChannel } from './logger.js';
 import * as coreBridge from './core-bridge.js';
 import { ScenariosProvider } from './providers/scenarios.js';
 import { StepWalkerProvider } from './providers/step-walker.js';
@@ -26,6 +26,7 @@ import { openStepInEditor } from './decorations.js';
 import type { ScenarioStep } from '@codegraph/core';
 
 export function activate(context: vscode.ExtensionContext): void {
+  logEntry('activate', { extensionVersion: context.extension.packageJSON?.version });
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
   // Initialize logging
@@ -35,7 +36,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   log('info', 'CodeGraph Navigator activating', {
     workspaceRoot,
-    extensionVersion: '0.2.0',
+    extensionVersion: context.extension.packageJSON.version,
   });
 
   // Check core availability (always true since it's a direct dependency)
@@ -54,8 +55,12 @@ export function activate(context: vscode.ExtensionContext): void {
   const functionsProvider = new FunctionsProvider();
 
   // Register tree data providers
+  const scenariosTreeView = vscode.window.createTreeView('codegraph.scenarios', {
+    treeDataProvider: scenariosProvider,
+  });
+  scenariosTreeView.description = `v${context.extension.packageJSON.version}`;
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('codegraph.scenarios', scenariosProvider),
+    scenariosTreeView,
     vscode.window.registerTreeDataProvider('codegraph.stepWalker', stepWalkerProvider),
     vscode.window.registerTreeDataProvider('codegraph.functions', functionsProvider)
   );
@@ -63,206 +68,295 @@ export function activate(context: vscode.ExtensionContext): void {
   // --- Commands ---
 
   // Show Code Graph Viewer — focus the sidebar
+  log('debug', 'Registering command: codegraph.showViewer');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.showViewer', async () => {
-      log('info', 'Show Code Graph Viewer');
-      await vscode.commands.executeCommand('workbench.view.extension.codegraph-navigator');
+      logEntry('cmd:showViewer');
+      try {
+        await vscode.commands.executeCommand('workbench.view.extension.codegraph-navigator');
+        logExit('cmd:showViewer');
+      } catch (err) {
+        logError('cmd:showViewer', err);
+        throw err;
+      }
     })
   );
 
   // Show Output Channel — open the CodeGraph Navigator output panel
+  log('debug', 'Registering command: codegraph.showOutput');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.showOutput', () => {
+      logEntry('cmd:showOutput');
       showOutputChannel();
+      logExit('cmd:showOutput');
     })
   );
 
   // Refresh scenarios
+  log('debug', 'Registering command: codegraph.refreshScenarios');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.refreshScenarios', () => {
+      logEntry('cmd:refreshScenarios');
       scenariosProvider.refresh();
+      logExit('cmd:refreshScenarios');
     })
   );
 
   // View scenario (opens step walker)
+  log('debug', 'Registering command: codegraph.viewScenario');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.viewScenario', async (node: { scenario: { id: string } }) => {
-      const scenarioId = node?.scenario?.id;
-      if (!scenarioId) {
-        const input = await vscode.window.showInputBox({
-          prompt: 'Enter scenario ID',
-          placeHolder: 'e.g., user-login-flow',
-        });
-        if (!input) { return; }
-        await loadAndWalk(input, scenariosProvider, stepWalkerProvider);
-      } else {
-        await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider);
+      logEntry('cmd:viewScenario', { scenarioId: node?.scenario?.id });
+      try {
+        const scenarioId = node?.scenario?.id;
+        if (!scenarioId) {
+          const input = await vscode.window.showInputBox({
+            prompt: 'Enter scenario ID',
+            placeHolder: 'e.g., user-login-flow',
+          });
+          if (!input) { logExit('cmd:viewScenario', 'cancelled'); return; }
+          await loadAndWalk(input, scenariosProvider, stepWalkerProvider);
+        } else {
+          await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider);
+        }
+        logExit('cmd:viewScenario');
+      } catch (err) {
+        logError('cmd:viewScenario', err);
+        throw err;
       }
     })
   );
 
   // Walk scenario (same as view, shows in step walker)
+  log('debug', 'Registering command: codegraph.walkScenario');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.walkScenario', async (node: { scenario: { id: string } }) => {
-      const scenarioId = node?.scenario?.id;
-      if (!scenarioId) { return; }
-      await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider);
+      logEntry('cmd:walkScenario', { scenarioId: node?.scenario?.id });
+      try {
+        const scenarioId = node?.scenario?.id;
+        if (!scenarioId) { logExit('cmd:walkScenario', 'no scenarioId'); return; }
+        await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider);
+        logExit('cmd:walkScenario');
+      } catch (err) {
+        logError('cmd:walkScenario', err);
+        throw err;
+      }
     })
   );
 
   // Next step
+  log('debug', 'Registering command: codegraph.nextStep');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.nextStep', () => {
+      logEntry('cmd:nextStep');
       stepWalkerProvider.nextStep();
       autoOpenCurrentStep(stepWalkerProvider, workspaceRoot);
+      logExit('cmd:nextStep');
     })
   );
 
   // Previous step
+  log('debug', 'Registering command: codegraph.prevStep');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.prevStep', () => {
+      logEntry('cmd:prevStep');
       stepWalkerProvider.prevStep();
       autoOpenCurrentStep(stepWalkerProvider, workspaceRoot);
+      logExit('cmd:prevStep');
     })
   );
 
   // Open step in editor
+  log('debug', 'Registering command: codegraph.openStepInEditor');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.openStepInEditor', async (step: ScenarioStep) => {
-      if (!step) {
-        const currentStep = stepWalkerProvider.getCurrentStep();
-        if (currentStep) {
-          step = currentStep;
-        } else {
-          return;
+      logEntry('cmd:openStepInEditor', { stepNumber: step?.stepNumber, functionName: step?.functionName });
+      try {
+        if (!step) {
+          const currentStep = stepWalkerProvider.getCurrentStep();
+          if (currentStep) {
+            step = currentStep;
+          } else {
+            logExit('cmd:openStepInEditor', 'no step');
+            return;
+          }
         }
+        const scenarioView = stepWalkerProvider.getScenarioView();
+        await openStepInEditor(step, workspaceRoot, scenarioView?.steps);
+        logExit('cmd:openStepInEditor');
+      } catch (err) {
+        logError('cmd:openStepInEditor', err);
+        throw err;
       }
-      const scenarioView = stepWalkerProvider.getScenarioView();
-      await openStepInEditor(step, workspaceRoot, scenarioView?.steps);
     })
   );
 
   // Refresh functions
+  log('debug', 'Registering command: codegraph.refreshFunctions');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.refreshFunctions', () => {
+      logEntry('cmd:refreshFunctions');
       functionsProvider.refresh();
+      logExit('cmd:refreshFunctions');
     })
   );
 
   // Search functions
+  log('debug', 'Registering command: codegraph.searchFunctions');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.searchFunctions', async () => {
-      const query = await vscode.window.showInputBox({
-        prompt: 'Search functions by name',
-        placeHolder: 'e.g., authenticate',
-      });
-      functionsProvider.setSearch(query || undefined);
+      logEntry('cmd:searchFunctions');
+      try {
+        const query = await vscode.window.showInputBox({
+          prompt: 'Search functions by name',
+          placeHolder: 'e.g., authenticate',
+        });
+        functionsProvider.setSearch(query || undefined);
+        logExit('cmd:searchFunctions', { query });
+      } catch (err) {
+        logError('cmd:searchFunctions', err);
+        throw err;
+      }
     })
   );
 
   // Show scenarios for function (from tree context menu)
+  log('debug', 'Registering command: codegraph.showScenariosForFunction');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.showScenariosForFunction', async (node: { func: { qualifiedName: string } }) => {
       const functionName = node?.func?.qualifiedName;
-      if (!functionName) { return; }
+      logEntry('cmd:showScenariosForFunction', { functionName });
+      try {
+        if (!functionName) { logExit('cmd:showScenariosForFunction', 'no functionName'); return; }
 
-      await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: `Finding scenarios for ${functionName}...` },
-        async () => {
-          const scenarios = await coreBridge.getScenariosForFunction(functionName);
-          if (scenarios.length === 0) {
-            vscode.window.showInformationMessage(
-              `No scenarios found involving ${functionName}. Try discovering new scenarios.`
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `Finding scenarios for ${functionName}...` },
+          async () => {
+            const scenarios = await coreBridge.getScenariosForFunction(functionName);
+            if (scenarios.length === 0) {
+              vscode.window.showInformationMessage(
+                `No scenarios found involving ${functionName}. Try discovering new scenarios.`
+              );
+              return;
+            }
+            const picked = await vscode.window.showQuickPick(
+              scenarios.map((s) => ({
+                label: s.name,
+                description: `${s.status} | ${(s.confidence * 100).toFixed(0)}%`,
+                detail: s.description,
+                id: s.id,
+              })),
+              { placeHolder: 'Select a scenario to walk' }
             );
-            return;
+            if (picked) {
+              await loadAndWalk(picked.id, scenariosProvider, stepWalkerProvider);
+            }
           }
-          const picked = await vscode.window.showQuickPick(
-            scenarios.map((s) => ({
-              label: s.name,
-              description: `${s.status} | ${(s.confidence * 100).toFixed(0)}%`,
-              detail: s.description,
-              id: s.id,
-            })),
-            { placeHolder: 'Select a scenario to walk' }
-          );
-          if (picked) {
-            await loadAndWalk(picked.id, scenariosProvider, stepWalkerProvider);
-          }
-        }
-      );
+        );
+        logExit('cmd:showScenariosForFunction');
+      } catch (err) {
+        logError('cmd:showScenariosForFunction', err);
+        throw err;
+      }
     })
   );
 
   // Discover scenarios from function (from tree context menu)
+  log('debug', 'Registering command: codegraph.discoverFromFunction');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.discoverFromFunction', async (node: { func: { qualifiedName: string } }) => {
       const functionName = node?.func?.qualifiedName;
-      if (!functionName) { return; }
+      logEntry('cmd:discoverFromFunction', { functionName });
+      try {
+        if (!functionName) { logExit('cmd:discoverFromFunction', 'no functionName'); return; }
 
-      await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: `Discovering scenarios from ${functionName}...`, cancellable: false },
-        async () => {
-          await coreBridge.discoverFromFunction(functionName);
-          scenariosProvider.refresh();
-        }
-      );
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `Discovering scenarios from ${functionName}...`, cancellable: false },
+          async () => {
+            await coreBridge.discoverFromFunction(functionName);
+            scenariosProvider.refresh();
+          }
+        );
+        logExit('cmd:discoverFromFunction');
+      } catch (err) {
+        logError('cmd:discoverFromFunction', err);
+        throw err;
+      }
     })
   );
 
   // Show scenarios for symbol (editor right-click)
+  log('debug', 'Registering command: codegraph.showScenariosForSymbol');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.showScenariosForSymbol', async () => {
-      const functionName = getWordUnderCursor();
-      if (!functionName) {
-        vscode.window.showWarningMessage('CodeGraph: Place cursor on a function name first.');
-        return;
-      }
-      log('info', 'Show scenarios for symbol', { functionName });
-
-      await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: `Finding scenarios for "${functionName}"...` },
-        async () => {
-          const scenarios = await coreBridge.getScenariosForFunction(functionName);
-          if (scenarios.length === 0) {
-            vscode.window.showInformationMessage(
-              `No scenarios found involving "${functionName}".`
-            );
-            return;
-          }
-          const picked = await vscode.window.showQuickPick(
-            scenarios.map((s) => ({
-              label: s.name,
-              description: `${s.status} | ${(s.confidence * 100).toFixed(0)}%`,
-              detail: s.description,
-              id: s.id,
-            })),
-            { placeHolder: 'Select a scenario to walk' }
-          );
-          if (picked) {
-            await loadAndWalk(picked.id, scenariosProvider, stepWalkerProvider);
-          }
+      logEntry('cmd:showScenariosForSymbol');
+      try {
+        const functionName = getWordUnderCursor();
+        if (!functionName) {
+          vscode.window.showWarningMessage('CodeGraph: Place cursor on a function name first.');
+          logExit('cmd:showScenariosForSymbol', 'no word under cursor');
+          return;
         }
-      );
+        log('info', 'Show scenarios for symbol', { functionName });
+
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `Finding scenarios for "${functionName}"...` },
+          async () => {
+            const scenarios = await coreBridge.getScenariosForFunction(functionName);
+            if (scenarios.length === 0) {
+              vscode.window.showInformationMessage(
+                `No scenarios found involving "${functionName}".`
+              );
+              return;
+            }
+            const picked = await vscode.window.showQuickPick(
+              scenarios.map((s) => ({
+                label: s.name,
+                description: `${s.status} | ${(s.confidence * 100).toFixed(0)}%`,
+                detail: s.description,
+                id: s.id,
+              })),
+              { placeHolder: 'Select a scenario to walk' }
+            );
+            if (picked) {
+              await loadAndWalk(picked.id, scenariosProvider, stepWalkerProvider);
+            }
+          }
+        );
+        logExit('cmd:showScenariosForSymbol');
+      } catch (err) {
+        logError('cmd:showScenariosForSymbol', err);
+        throw err;
+      }
     })
   );
 
   // Discover scenarios from symbol (editor right-click)
+  log('debug', 'Registering command: codegraph.discoverFromSymbol');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.discoverFromSymbol', async () => {
-      const functionName = getWordUnderCursor();
-      if (!functionName) {
-        vscode.window.showWarningMessage('CodeGraph: Place cursor on a function name first.');
-        return;
-      }
-      log('info', 'Discover from symbol', { functionName });
-
-      await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: `Discovering scenarios from "${functionName}"...`, cancellable: false },
-        async () => {
-          await coreBridge.discoverFromFunction(functionName);
-          scenariosProvider.refresh();
+      logEntry('cmd:discoverFromSymbol');
+      try {
+        const functionName = getWordUnderCursor();
+        if (!functionName) {
+          vscode.window.showWarningMessage('CodeGraph: Place cursor on a function name first.');
+          logExit('cmd:discoverFromSymbol', 'no word under cursor');
+          return;
         }
-      );
+        log('info', 'Discover from symbol', { functionName });
+
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `Discovering scenarios from "${functionName}"...`, cancellable: false },
+          async () => {
+            await coreBridge.discoverFromFunction(functionName);
+            scenariosProvider.refresh();
+          }
+        );
+        logExit('cmd:discoverFromSymbol');
+      } catch (err) {
+        logError('cmd:discoverFromSymbol', err);
+        throw err;
+      }
     })
   );
 
@@ -274,11 +368,14 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   log('info', 'CodeGraph Navigator activated');
+  logExit('activate');
 }
 
 export function deactivate(): void {
+  logEntry('deactivate');
   log('info', 'CodeGraph Navigator deactivated');
   coreBridge.dispose();
+  logExit('deactivate');
   disposeLogger();
 }
 
@@ -294,16 +391,19 @@ async function loadAndWalk(
   scenariosProvider: ScenariosProvider,
   stepWalkerProvider: StepWalkerProvider
 ): Promise<void> {
-  log('info', `Walking scenario: ${scenarioId}`);
+  logEntry('loadAndWalk', { scenarioId });
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Loading scenario ${scenarioId}...` },
     async () => {
       const view = await scenariosProvider.getScenarioView(scenarioId);
       if (!view) {
+        log('warn', 'loadAndWalk: scenario view not found', { scenarioId });
         vscode.window.showErrorMessage(`CodeGraph: Scenario "${scenarioId}" not found.`);
+        logExit('loadAndWalk', 'not found');
         return;
       }
+      log('debug', 'loadAndWalk: view loaded', { scenarioId, stepCount: view.steps.length });
       stepWalkerProvider.loadScenario(view);
 
       // Focus the step walker view
@@ -317,6 +417,7 @@ async function loadAndWalk(
       }
     }
   );
+  logExit('loadAndWalk');
 }
 
 /**
@@ -326,23 +427,37 @@ function autoOpenCurrentStep(
   stepWalkerProvider: StepWalkerProvider,
   workspaceRoot: string | undefined
 ): void {
+  logEntry('autoOpenCurrentStep');
   const step = stepWalkerProvider.getCurrentStep();
   if (step) {
+    log('debug', 'autoOpenCurrentStep: opening step', { stepNumber: step.stepNumber, functionName: step.functionName });
     const scenarioView = stepWalkerProvider.getScenarioView();
     openStepInEditor(step, workspaceRoot, scenarioView?.steps);
+  } else {
+    log('debug', 'autoOpenCurrentStep: no current step');
   }
+  logExit('autoOpenCurrentStep');
 }
 
 /**
  * Get the word (function name) under the cursor in the active editor.
  */
 function getWordUnderCursor(): string | undefined {
+  logEntry('getWordUnderCursor');
   const editor = vscode.window.activeTextEditor;
-  if (!editor) { return undefined; }
+  if (!editor) {
+    logExit('getWordUnderCursor', null);
+    return undefined;
+  }
 
   const position = editor.selection.active;
   const wordRange = editor.document.getWordRangeAtPosition(position);
-  if (!wordRange) { return undefined; }
+  if (!wordRange) {
+    logExit('getWordUnderCursor', null);
+    return undefined;
+  }
 
-  return editor.document.getText(wordRange);
+  const word = editor.document.getText(wordRange);
+  logExit('getWordUnderCursor', word);
+  return word;
 }

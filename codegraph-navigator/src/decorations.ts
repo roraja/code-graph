@@ -10,7 +10,7 @@
 
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { log } from './logger.js';
+import { log, logEntry, logExit, logError } from './logger.js';
 import type { ScenarioStep } from '@codegraph/core';
 
 /** Decoration type for the current step line */
@@ -50,6 +50,7 @@ export async function openStepInEditor(
   workspaceRoot: string | undefined,
   allSteps?: ScenarioStep[]
 ): Promise<void> {
+  logEntry('openStepInEditor', { stepNumber: step.stepNumber, functionName: step.functionName, functionId: step.functionId });
   // The step's functionId is typically "filePath:startLine"
   const filePath = extractFilePath(step.functionId, workspaceRoot);
 
@@ -61,6 +62,7 @@ export async function openStepInEditor(
     vscode.window.showWarningMessage(
       `CodeGraph: Could not determine file path for ${step.functionName}`
     );
+    logExit('openStepInEditor', 'no file path');
     return;
   }
 
@@ -89,6 +91,7 @@ export async function openStepInEditor(
     editor.setDecorations(stepDecorationType, currentDecorations);
 
     // Highlight other steps in the same file
+    let otherDecorationCount = 0;
     if (allSteps) {
       const otherDecorations: vscode.DecorationOptions[] = allSteps
         .filter(
@@ -108,17 +111,21 @@ export async function openStepInEditor(
             `\`${s.functionName}\`\n\n${s.justification}`
           ),
         }));
+      otherDecorationCount = otherDecorations.length;
       editor.setDecorations(otherStepDecorationType, otherDecorations);
     }
 
-    log('info', 'Opened step in editor', {
+    log('debug', 'openStepInEditor: decorations applied', {
       file: filePath,
       line: step.line,
       step: step.stepNumber,
+      currentDecorations: currentDecorations.length,
+      otherDecorations: otherDecorationCount,
     });
+    logExit('openStepInEditor');
   } catch (err) {
+    logError('openStepInEditor', err);
     const message = err instanceof Error ? err.message : String(err);
-    log('error', 'Failed to open step in editor', { error: message });
     vscode.window.showErrorMessage(`CodeGraph: Could not open file — ${message}`);
   }
 }
@@ -127,8 +134,10 @@ export async function openStepInEditor(
  * Clear all codegraph decorations from the active editor.
  */
 export function clearDecorations(editor: vscode.TextEditor): void {
+  logEntry('clearDecorations');
   editor.setDecorations(stepDecorationType, []);
   editor.setDecorations(otherStepDecorationType, []);
+  logExit('clearDecorations');
 }
 
 /**
@@ -139,24 +148,33 @@ function extractFilePath(
   functionId: string,
   workspaceRoot: string | undefined
 ): string | null {
+  logEntry('extractFilePath', { functionId });
   // Split on last colon to separate path from line number
   const lastColon = functionId.lastIndexOf(':');
-  if (lastColon === -1) { return null; }
+  if (lastColon === -1) {
+    logExit('extractFilePath', null);
+    return null;
+  }
 
   const rawPath = functionId.substring(0, lastColon);
-  if (!rawPath) { return null; }
+  if (!rawPath) {
+    logExit('extractFilePath', null);
+    return null;
+  }
 
+  let resolved: string;
   // If already absolute, use as-is
   if (rawPath.startsWith('/')) {
-    return rawPath;
+    resolved = rawPath;
+  } else if (workspaceRoot) {
+    // Otherwise resolve relative to workspace
+    resolved = path.join(workspaceRoot, rawPath);
+  } else {
+    resolved = rawPath;
   }
 
-  // Otherwise resolve relative to workspace
-  if (workspaceRoot) {
-    return path.join(workspaceRoot, rawPath);
-  }
-
-  return rawPath;
+  logExit('extractFilePath', resolved);
+  return resolved;
 }
 
 /**

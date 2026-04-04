@@ -34,7 +34,7 @@ Express app
 `Scenario` (with nested `steps`), `ScenarioStep`, `Function`, `Class`, `Branch`, `Variable`, `CallEdge`, `Correction`, `IndexJob`, `TraceResult`, `CorrectionResult`, `Stats`
 
 ### Input Types
-`ScenarioFilter`, `CreateScenarioInput`, `CorrectionInput`, `IndexConfig`
+`ScenarioFilter` (1 field: status), `CreateScenarioInput` (6 fields: name, description, entryFunction, triggerCondition, discoveredBy, confidence), `CorrectionInput` (5 fields: message, scenarioId, stepNumber, functionId, userId), `IndexConfig` (2 fields: rootDirs, excludeDirs)
 
 ### Queries
 `scenarios(filter)`, `scenario(id)`, `scenarioSteps(scenarioId, from, to)`, `function(id)`, `functionByName(qualifiedName)`, `callers(functionId)`, `callees(functionId)`, `callChain(fromId, toId, maxDepth)`, `classHierarchy(classId)`, `implementations(methodId)`, `searchFunctions(query, limit)`, `searchScenarios(query)`, `corrections(scenarioId, scope)`, `stats`
@@ -47,6 +47,7 @@ Express app
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/api/health` | Health check (returns Neo4j connection status) |
+| GET | `/api/config` | Public config (projectName, editor settings incl. sshHost) |
 | GET | `/api/stats` | Graph statistics |
 | GET | `/api/scenarios` | List scenarios (optional `?status=` filter) |
 | POST | `/api/scenarios/discover` | Discover scenarios via AI (body: `{ hint }`) |
@@ -58,6 +59,7 @@ Express app
 | GET | `/api/functions/search` | Search functions (`?q=&limit=`) |
 | GET | `/api/functions/:id/callers` | Get callers of a function |
 | GET | `/api/functions/:id/callees` | Get callees of a function |
+| GET | `/api/graph/:scenarioId` | Get Cytoscape visualization data (nodes + edges from scenario steps) |
 
 ## Patterns
 

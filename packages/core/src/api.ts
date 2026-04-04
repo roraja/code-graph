@@ -17,7 +17,7 @@ import { GraphSchema } from './graph/schema.js';
 import { CodeIndexer } from './graph/indexer.js';
 import { QueryEngine } from './graph/queries.js';
 import { ScenarioEngine, type Scenario, type ScenarioStep, type CreateScenarioInput } from './scenario/engine.js';
-import { ScenarioTracer, type TraceConfig } from './scenario/tracer.js';
+import { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
 import { CorrectionEngine, type Correction, type StructuredCorrection } from './correction/engine.js';
 import { ScenarioDiscoveryAgent, type DiscoveredScenario } from './ai/scenario-discovery.js';
 import { PathTracerAgent } from './ai/path-tracer.js';
@@ -427,6 +427,7 @@ export class CodeGraphClient {
       apiKey: this.config.ai.apiKey,
       maxTokens: this.config.ai.maxTokensPerRequest,
       temperature: this.config.ai.temperature,
+      projectRoot: root,
     });
 
     this.discoveryAgent = new ScenarioDiscoveryAgent(aiProvider);
@@ -610,10 +611,11 @@ export class CodeGraphClient {
 
   /**
    * Use AI to discover new scenarios starting from a function.
+   * After discovery, each scenario is automatically traced to generate steps.
    *
    * @param functionName - Function name / hint for the discovery agent
    * @param count - Maximum scenarios to discover (default 3)
-   * @returns The discovered scenarios (also saved to the graph)
+   * @returns The discovered scenarios (also saved to the graph with traced steps)
    */
   async discoverFromFunction(
     functionName: string,
@@ -630,22 +632,75 @@ export class CodeGraphClient {
       .filter((f) => f.isExported)
       .map((f) => ({
         id: f.id,
-        name: f.qualifiedName,
+        name: f.name,
+        qualifiedName: f.qualifiedName,
         signature: f.signature,
         filePath: f.filePath,
+        startLine: f.startLine,
+        endLine: f.endLine,
+        returnType: f.returnType,
+        visibility: f.visibility,
+        language: f.language,
         documentation: f.documentation,
+        sourceCode: f.sourceCode,
       }));
+
+    // Find the target function to build a rich hint with file/line context
+    const targetFunc = functions.find(
+      (f) =>
+        f.name === functionName ||
+        f.qualifiedName === functionName ||
+        f.qualifiedName.endsWith(`::${functionName}`) ||
+        f.qualifiedName.endsWith(`.${functionName}`),
+    );
+
+    let userHint: string;
+    if (targetFunc) {
+      userHint = [
+        `Focus on scenarios starting from the function "${targetFunc.qualifiedName}".`,
+        `File: ${targetFunc.filePath}`,
+        `Lines: ${targetFunc.startLine}–${targetFunc.endLine}`,
+        `Signature: ${targetFunc.signature}`,
+        targetFunc.returnType ? `Returns: ${targetFunc.returnType}` : '',
+        targetFunc.documentation ? `Documentation: ${targetFunc.documentation}` : '',
+        targetFunc.sourceCode
+          ? `Source code:\n${targetFunc.sourceCode.slice(0, 1000)}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
+    } else {
+      // No exact match — try a partial/substring match for extra context
+      const partialMatch = functions.find(
+        (f) =>
+          f.name.includes(functionName) ||
+          f.qualifiedName.includes(functionName),
+      );
+      if (partialMatch) {
+        userHint = [
+          `Focus on scenarios starting from "${functionName}" (closest match: "${partialMatch.qualifiedName}").`,
+          `File: ${partialMatch.filePath}`,
+          `Lines: ${partialMatch.startLine}–${partialMatch.endLine}`,
+          partialMatch.signature ? `Signature: ${partialMatch.signature}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n');
+      } else {
+        userHint = `Focus on scenarios starting from "${functionName}" (not found in the graph — name may be approximate).`;
+      }
+    }
 
     const scenarios = await this.discoveryAgent!.discover({
       entryPoints,
       eventHandlers: [],
       publicAPIs: entryPoints,
-      userHint: `Focus on scenarios starting from ${functionName}`,
+      userHint,
     });
 
-    // Save discovered scenarios
-    for (const s of scenarios.slice(0, count)) {
-      await this.scenarioEngine!.createScenario({
+    // Save discovered scenarios and trace each one
+    const saved = scenarios.slice(0, count);
+    for (const s of saved) {
+      const created = await this.scenarioEngine!.createScenario({
         name: s.name,
         description: s.description,
         entryFunction: s.entryFunction,
@@ -653,9 +708,72 @@ export class CodeGraphClient {
         discoveredBy: 'ai',
         confidence: s.confidence,
       });
+
+      // Auto-trace the scenario to generate steps
+      try {
+        await this.traceScenario(created.id);
+      } catch (traceErr) {
+        // Tracing may fail if the entry function isn't in the graph —
+        // the scenario is still saved, just without steps.
+        const msg = traceErr instanceof Error ? traceErr.message : String(traceErr);
+        console.warn(`[CodeGraph] Auto-trace failed for "${created.name}": ${msg}`);
+      }
     }
 
-    return scenarios.slice(0, count);
+    return saved;
+  }
+
+  // -----------------------------------------------------------------------
+  // Tracing
+  // -----------------------------------------------------------------------
+
+  /**
+   * Trace a scenario to generate step-by-step execution walkthrough.
+   *
+   * Reads the entry function, follows calls, asks AI to decide branches
+   * and virtual dispatch, and saves the resulting steps to the graph.
+   *
+   * @param scenarioId - The scenario to trace
+   * @returns The trace result with steps and metrics
+   */
+  async traceScenario(
+    scenarioId: string,
+  ): Promise<TraceResult> {
+    if (this.isMock) {
+      return {
+        scenarioId,
+        steps: [],
+        functionsTraversed: 0,
+        branchDecisions: 0,
+        dispatchesResolved: 0,
+        durationMs: 0,
+      };
+    }
+
+    await this.ensureConnected();
+
+    const scenario = await this.scenarioEngine!.getScenario(scenarioId);
+    if (!scenario) {
+      throw new Error(`Scenario not found: ${scenarioId}`);
+    }
+
+    const traceConfig: Partial<TraceConfig> = this.config?.tracing
+      ? {
+          maxDepth: this.config.tracing.maxDepth,
+          maxStepsPerFunction: this.config.tracing.maxStepsPerFunction,
+          boringFunctions: this.config.tracing.boringFunctions,
+          boringNamespaces: this.config.tracing.boringNamespaces,
+          focusFunctions: this.config.tracing.focusFunctions,
+        }
+      : {};
+
+    const result = await this.scenarioTracer!.trace(scenario, traceConfig);
+
+    // Save the traced steps
+    await this.scenarioEngine!.saveSteps(scenarioId, result.steps);
+    await this.scenarioEngine!.updateStatus(scenarioId, 'traced');
+
+    return result;
   }
 
   // -----------------------------------------------------------------------

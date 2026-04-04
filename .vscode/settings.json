@@ -1,0 +1,8 @@
+{
+    "neo4j.connection": {
+        "uri": "bolt://localhost:7687",
+        "username": "neo4j"
+    },
+    "codegraph.cliPath": "codegraph",
+    "codegraph.autoOpenStep": true
+}

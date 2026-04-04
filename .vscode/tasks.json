@@ -1,0 +1,92 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CodeGraph Navigator: Install Dependencies",
+      "type": "shell",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}/codegraph-navigator"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph Core: Build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/packages/core"
+      },
+      "group": "build",
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "CodeGraph Navigator: Build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/codegraph-navigator"
+      },
+      "group": "build",
+      "dependsOn": [
+        "CodeGraph Navigator: Install Dependencies",
+        "CodeGraph Core: Build"
+      ],
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "CodeGraph Navigator: Watch",
+      "type": "shell",
+      "command": "npm run watch",
+      "options": {
+        "cwd": "${workspaceFolder}/codegraph-navigator"
+      },
+      "isBackground": true,
+      "group": "build",
+      "problemMatcher": [
+        "$tsc-watch"
+      ]
+    },
+    {
+      "label": "CodeGraph Navigator: Package Extension (VSIX)",
+      "type": "shell",
+      "command": "npx @vscode/vsce package --no-dependencies",
+      "options": {
+        "cwd": "${workspaceFolder}/codegraph-navigator"
+      },
+      "group": "build",
+      "dependsOn": "CodeGraph Navigator: Build",
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph Navigator: Install Extension (VSIX)",
+      "type": "shell",
+      "command": "code --uninstall-extension codegraph.codegraph-navigator 2>/dev/null; code --install-extension $(ls -t codegraph-navigator-*.vsix | head -1) --force",
+      "options": {
+        "cwd": "${workspaceFolder}/codegraph-navigator"
+      },
+      "dependsOn": "CodeGraph Navigator: Package Extension (VSIX)",
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph Navigator: Build & Install",
+      "dependsOn": "CodeGraph Navigator: Install Extension (VSIX)",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CodeGraph Navigator: Uninstall Extension",
+      "type": "shell",
+      "command": "code --uninstall-extension codegraph.codegraph-navigator",
+      "problemMatcher": []
+    }
+  ]
+}

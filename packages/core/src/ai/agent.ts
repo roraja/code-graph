@@ -26,6 +26,8 @@ export interface AIConfig {
   maxTokens?: number;
   /** Sampling temperature (0–2). Lower values are more deterministic. */
   temperature?: number;
+  /** Project root directory — used as cwd for CLI-based providers. */
+  projectRoot?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +337,7 @@ export function createAIProvider(config: AIConfig): AIProvider {
     case 'mock':
       return new MockAIProvider();
     case 'copilot':
-      return new CopilotCLIProvider();
+      return new CopilotCLIProvider({ cwd: config.projectRoot });
     default:
       throw new Error(`Unknown AI provider: ${String((config as AIConfig).provider)}`);
   }

@@ -15,7 +15,7 @@ import {
   type ScenarioView,
 } from '@codegraph/core';
 import type { Scenario, ScenarioStep, FunctionNode } from '@codegraph/core';
-import { log } from './logger.js';
+import { log, logEntry, logExit, logError } from './logger.js';
 
 /** Re-export types so the rest of the extension imports from here or @codegraph/core. */
 export type { Scenario, ScenarioStep, ScenarioView, FunctionNode as FunctionInfo };
@@ -38,7 +38,12 @@ function getWorkspaceRoot(): string | undefined {
  * On first call, probes the database; if unreachable, falls back to mock.
  */
 async function getClient(): Promise<CodeGraphClient> {
-  if (client) return client;
+  logEntry('coreBridge.getClient');
+  if (client) {
+    log('debug', 'coreBridge.getClient: returning cached client');
+    logExit('coreBridge.getClient', 'cached');
+    return client;
+  }
 
   const projectRoot = getWorkspaceRoot();
 
@@ -52,6 +57,7 @@ async function getClient(): Promise<CodeGraphClient> {
         dbAvailable = true;
         client = probe;
         log('info', 'Live database is available');
+        logExit('coreBridge.getClient', 'live');
         return client;
       } else {
         dbAvailable = false;
@@ -71,12 +77,16 @@ async function getClient(): Promise<CodeGraphClient> {
   // Use mock mode
   if (!dbAvailable) {
     client = createCodeGraphClient({ projectRoot, mock: true });
+    log('debug', 'coreBridge.getClient: created mock client');
+    logExit('coreBridge.getClient', 'mock');
     return client;
   }
 
   // Live mode (dbAvailable === true but client was disposed)
   client = createCodeGraphClient({ projectRoot });
   await client.connect();
+  log('debug', 'coreBridge.getClient: reconnected live client');
+  logExit('coreBridge.getClient', 'reconnected');
   return client;
 }
 
@@ -85,21 +95,25 @@ async function getClient(): Promise<CodeGraphClient> {
  * Call after config changes or to force re-probe.
  */
 export async function resetConnection(): Promise<void> {
+  logEntry('coreBridge.resetConnection');
   dbAvailable = undefined;
   if (client) {
     await client.dispose();
     client = null;
   }
+  logExit('coreBridge.resetConnection');
 }
 
 /**
  * Dispose the client. Call on extension deactivation.
  */
 export async function dispose(): Promise<void> {
+  logEntry('coreBridge.dispose');
   if (client) {
     await client.dispose();
     client = null;
   }
+  logExit('coreBridge.dispose');
 }
 
 // ---------------------------------------------------------------------------
@@ -110,15 +124,14 @@ export async function dispose(): Promise<void> {
  * List all scenarios.
  */
 export async function listScenarios(): Promise<Scenario[]> {
+  logEntry('coreBridge.listScenarios');
   try {
     const c = await getClient();
     const scenarios = await c.listScenarios();
-    log('info', `Listed ${scenarios.length} scenario(s)`);
+    logExit('coreBridge.listScenarios', { count: scenarios.length });
     return scenarios;
   } catch (err) {
-    log('error', 'Failed to list scenarios', {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logError('coreBridge.listScenarios', err);
     return [];
   }
 }
@@ -129,19 +142,18 @@ export async function listScenarios(): Promise<Scenario[]> {
 export async function getScenarioView(
   scenarioId: string,
 ): Promise<ScenarioView | null> {
+  logEntry('coreBridge.getScenarioView', { scenarioId });
   try {
     const c = await getClient();
     const view = await c.getScenarioView(scenarioId);
     if (view) {
-      log('info', `Loaded scenario: ${scenarioId}`, {
-        stepCount: view.steps.length,
-      });
+      logExit('coreBridge.getScenarioView', { found: true, stepCount: view.steps.length });
+    } else {
+      logExit('coreBridge.getScenarioView', { found: false });
     }
     return view;
   } catch (err) {
-    log('error', `Failed to load scenario: ${scenarioId}`, {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logError('coreBridge.getScenarioView', err);
     return null;
   }
 }
@@ -152,15 +164,14 @@ export async function getScenarioView(
 export async function listFunctions(
   search?: string,
 ): Promise<FunctionNode[]> {
+  logEntry('coreBridge.listFunctions', { search });
   try {
     const c = await getClient();
     const result = await c.listFunctions(search);
-    log('info', `Listed ${result.length} functions`, { search });
+    logExit('coreBridge.listFunctions', { count: result.length });
     return result;
   } catch (err) {
-    log('error', 'Failed to list functions', {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logError('coreBridge.listFunctions', err);
     return [];
   }
 }
@@ -171,16 +182,14 @@ export async function listFunctions(
 export async function getScenariosForFunction(
   functionName: string,
 ): Promise<Scenario[]> {
+  logEntry('coreBridge.getScenariosForFunction', { functionName });
   try {
-    log('info', `Finding scenarios for function: ${functionName}`);
     const c = await getClient();
     const matching = await c.getScenariosForFunction(functionName);
-    log('info', `Found ${matching.length} scenario(s) for function ${functionName}`);
+    logExit('coreBridge.getScenariosForFunction', { count: matching.length });
     return matching;
   } catch (err) {
-    log('error', 'Failed to get scenarios for function', {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logError('coreBridge.getScenariosForFunction', err);
     return [];
   }
 }
@@ -191,20 +200,21 @@ export async function getScenariosForFunction(
 export async function discoverFromFunction(
   functionName: string,
 ): Promise<void> {
-  log('info', `Discovering scenarios from function: ${functionName}`);
+  logEntry('coreBridge.discoverFromFunction', { functionName });
   try {
     const c = await getClient();
     const discovered = await c.discoverFromFunction(functionName, 3);
-    log('info', `Discovery complete: ${discovered.length} scenario(s)`, {
+    log('debug', 'coreBridge.discoverFromFunction: discovered scenarios', {
+      count: discovered.length,
       names: discovered.map((d) => d.name),
     });
+    logExit('coreBridge.discoverFromFunction', { count: discovered.length });
     vscode.window.showInformationMessage(
-      `CodeGraph: Discovery complete for ${functionName}. ` +
-        `Found ${discovered.length} scenario(s). Refresh to see results.`,
+      `CodeGraph: Discovered and traced ${discovered.length} scenario(s) from ${functionName}.`,
     );
   } catch (err) {
+    logError('coreBridge.discoverFromFunction', err);
     const message = err instanceof Error ? err.message : String(err);
-    log('error', 'Discovery failed', { error: message });
     vscode.window.showErrorMessage(
       `CodeGraph: Discovery failed — ${message}`,
     );
@@ -216,15 +226,14 @@ export async function discoverFromFunction(
  * Always returns true since @codegraph/core is a direct dependency.
  */
 export async function checkAvailability(): Promise<boolean> {
+  logEntry('coreBridge.checkAvailability');
   try {
-    // The module is imported — that means it's available.
-    // We'll probe the DB separately during first use.
     log('info', 'CodeGraph core module loaded successfully');
+    logExit('coreBridge.checkAvailability', true);
     return true;
   } catch (err) {
-    log('error', '@codegraph/core not available', {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logError('coreBridge.checkAvailability', err);
+    logExit('coreBridge.checkAvailability', false);
     return false;
   }
 }

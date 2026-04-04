@@ -2,7 +2,7 @@
   "name": "codegraph-navigator",
   "displayName": "CodeGraph Navigator",
   "description": "Explore CodeGraph scenarios, walk through traced execution paths, and inspect functions — all from the VS Code sidebar.",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "publisher": "codegraph",
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
       "activitybar": [
         {
           "id": "codegraph-navigator",
-          "title": "CodeGraph",
+          "title": "CodeGraph v0.4.0",
           "icon": "media/codegraph-icon.svg"
         }
       ]

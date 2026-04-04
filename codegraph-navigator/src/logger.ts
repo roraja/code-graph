@@ -97,6 +97,47 @@ export function log(
 }
 
 /**
+ * Log a function entry with its arguments.
+ * Usage: logEntry('functionName', { arg1, arg2 });
+ */
+export function logEntry(functionName: string, args?: Record<string, unknown>): void {
+  log('debug', `→ ${functionName}`, args);
+}
+
+/**
+ * Log a function exit with its return value.
+ * Usage: logExit('functionName', returnValue);
+ */
+export function logExit(functionName: string, result?: unknown): void {
+  const data = result !== undefined ? { result: summarize(result) } : undefined;
+  log('debug', `← ${functionName}`, data);
+}
+
+/**
+ * Log a function error.
+ */
+export function logError(functionName: string, error: unknown): void {
+  log('error', `✖ ${functionName}`, {
+    error: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3).join(' | ') : undefined,
+  });
+}
+
+/**
+ * Summarize a value for logging (truncate long strings, summarize arrays/objects).
+ */
+function summarize(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') return value.length > 200 ? value.substring(0, 200) + '...' : value;
+  if (Array.isArray(value)) return `Array(${value.length})`;
+  if (typeof value === 'object') {
+    const keys = Object.keys(value);
+    return `{${keys.slice(0, 5).join(', ')}${keys.length > 5 ? ', ...' : ''}}`;
+  }
+  return value;
+}
+
+/**
  * Dispose the output channel (call on deactivate).
  */
 export function disposeLogger(): void {

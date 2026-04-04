@@ -33,7 +33,7 @@ const Neo4jConfigSchema = z.object({
 
 /** AI provider configuration */
 const AIConfigSchema = z.object({
-  provider: z.enum(['openai', 'mock', 'copilot']).default('mock'),
+  provider: z.enum(['openai', 'mock', 'copilot']).default('copilot'),
   model: z.string().default('gpt-4-turbo'),
   apiKey: z.string().optional(),
   maxTokensPerRequest: z.number().default(120000),

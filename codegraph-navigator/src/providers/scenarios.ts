@@ -9,7 +9,7 @@
 
 import * as vscode from 'vscode';
 import * as coreBridge from '../core-bridge.js';
-import { log } from '../logger.js';
+import { log, logEntry, logExit } from '../logger.js';
 import type { Scenario, ScenarioStep, ScenarioView } from '@codegraph/core';
 
 /** A node in the scenarios tree — either a scenario or a step */
@@ -117,9 +117,11 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
   private viewCache = new Map<string, ScenarioView>();
 
   refresh(): void {
+    logEntry('ScenariosProvider.refresh');
     this.viewCache.clear();
     this._onDidChangeTreeData.fire();
     log('info', 'Scenarios tree refreshed');
+    logExit('ScenariosProvider.refresh');
   }
 
   getTreeItem(element: ScenarioTreeNode): vscode.TreeItem {
@@ -128,23 +130,28 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
 
   async getChildren(element?: ScenarioTreeNode): Promise<ScenarioTreeNode[]> {
     if (!element) {
+      logEntry('ScenariosProvider.getChildren', { elementType: 'root' });
       // Root level — list all scenarios
       try {
         const scenarios = await coreBridge.listScenarios();
+        logExit('ScenariosProvider.getChildren', { count: scenarios.length });
         return scenarios.map((s) => new ScenarioNode(s));
       } catch (err) {
         log('error', 'Failed to load scenarios for tree', {
           error: err instanceof Error ? err.message : String(err),
         });
+        logExit('ScenariosProvider.getChildren', { count: 0, error: true });
         return [];
       }
     }
 
     if (element instanceof ScenarioNode) {
-      // Expanding a scenario — load its steps
       const scenarioId = element.scenario.id;
+      logEntry('ScenariosProvider.getChildren', { elementType: 'scenario', scenarioId });
+      // Expanding a scenario — load its steps
       try {
         let view = this.viewCache.get(scenarioId);
+        const cacheHit = !!view;
         if (!view) {
           view = await coreBridge.getScenarioView(scenarioId) ?? undefined;
           if (view) {
@@ -152,6 +159,8 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
           }
         }
         if (view) {
+          log('debug', 'ScenariosProvider.getChildren: loaded steps', { scenarioId, cacheHit, stepCount: view.steps.length });
+          logExit('ScenariosProvider.getChildren', { count: view.steps.length });
           return view.steps.map((step) => new StepPreviewNode(step, scenarioId));
         }
       } catch (err) {
@@ -159,9 +168,11 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
           error: err instanceof Error ? err.message : String(err),
         });
       }
+      logExit('ScenariosProvider.getChildren', { count: 0 });
       return [];
     }
 
+    logExit('ScenariosProvider.getChildren', { count: 0 });
     return [];
   }
 
@@ -169,14 +180,20 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
    * Get a cached scenario view, or load it.
    */
   async getScenarioView(scenarioId: string): Promise<ScenarioView | undefined> {
+    logEntry('ScenariosProvider.getScenarioView', { scenarioId });
     let view = this.viewCache.get(scenarioId);
-    if (!view) {
-      const loaded = await coreBridge.getScenarioView(scenarioId);
-      if (loaded) {
-        this.viewCache.set(scenarioId, loaded);
-        view = loaded;
-      }
+    if (view) {
+      log('debug', 'ScenariosProvider.getScenarioView: cache hit', { scenarioId });
+      logExit('ScenariosProvider.getScenarioView', 'cache hit');
+      return view;
     }
+    log('debug', 'ScenariosProvider.getScenarioView: cache miss, loading', { scenarioId });
+    const loaded = await coreBridge.getScenarioView(scenarioId);
+    if (loaded) {
+      this.viewCache.set(scenarioId, loaded);
+      view = loaded;
+    }
+    logExit('ScenariosProvider.getScenarioView', view ? 'loaded' : 'not found');
     return view;
   }
 }

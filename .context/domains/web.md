@@ -2,7 +2,7 @@
 
 ## Scope
 
-React + Vite single-page application with graph visualization. Located in `packages/web/`. Connects to the server via REST API (not GraphQL).
+React + Vite single-page application with graph visualization. Located in `packages/web/`. Connects to the server via both REST API (`/api/*`) and GraphQL (`/graphql`) using Apollo Client.
 
 ## Key Technologies
 
@@ -12,6 +12,8 @@ React + Vite single-page application with graph visualization. Located in `packa
 | Vite 5 | Build tool + dev server |
 | Cytoscape.js | Call graph visualization |
 | Zustand | State management |
+| Apollo Client | GraphQL client (connected at `/graphql`) |
+| React Router DOM | Client-side routing |
 
 ## Key Files
 
@@ -36,13 +38,14 @@ React + Vite single-page application with graph visualization. Located in `packa
 
 ## API Client
 
-The web UI communicates with the server via REST API (`/api/*`), not GraphQL. The `api.ts` module provides typed functions:
+The web UI communicates with the server primarily via REST API (`/api/*`), with Apollo Client also configured for GraphQL (`/graphql`). The `api.ts` module provides typed functions:
 
 - `fetchScenarios()`, `fetchScenario(id)`, `fetchSteps(scenarioId, from?, to?)`
 - `discoverScenarios(hint?)`, `traceScenario(scenarioId)`
 - `submitCorrection(scenarioId, message, stepId?)`
 - `searchFunctions(query, limit?)`, `getCallers(functionId)`, `getCallees(functionId)`
 - `fetchGraphData(scenarioId)`, `getStats()`
+- `fetchConfig()` — fetches project config (projectName, editor settings incl. sshHost)
 
 ## Zustand Stores
 
@@ -59,7 +62,7 @@ Derived: `getFilteredNodes()`, `getFilteredEdges()`.
 ## Patterns
 
 - **Zustand stores**: State management over Redux — simpler API, no boilerplate
-- **REST API client**: Direct fetch to `/api/*` with typed response parsing
+- **Dual API clients**: REST API via typed fetch wrappers in `api.ts`; GraphQL via Apollo Client configured in `main.tsx`
 - **Cytoscape.js**: Declarative graph rendering for call paths and class hierarchies
 - **Vite**: HMR dev server (`npm run dev`), production build (`npm run build`)
 - **tsconfig**: Uses ESNext module (browser target), not Node16 like other packages

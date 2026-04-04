@@ -126,9 +126,39 @@ export class ScenarioTracer {
     };
 
     // Find the entry function in the graph
-    const entryFunction = await this.queryEngine.getFunctionByName(
+    // Try exact match first, then fuzzy match by name substring
+    let entryFunction = await this.queryEngine.getFunctionByName(
       scenario.entryFunction
     );
+
+    if (!entryFunction) {
+      // Fuzzy fallback: search for functions containing the entry name
+      const funcName = scenario.entryFunction.includes('::')
+        ? scenario.entryFunction.split('::').pop()!
+        : scenario.entryFunction.includes('.')
+          ? scenario.entryFunction.split('.').pop()!
+          : scenario.entryFunction;
+
+      const candidates = await this.queryEngine.searchFunctions(funcName, 10);
+      // Pick the best match — prefer exact qualifiedName ending
+      entryFunction =
+        candidates.find(
+          (f) =>
+            f.qualifiedName === scenario.entryFunction ||
+            f.qualifiedName.endsWith(`::${funcName}`) ||
+            f.qualifiedName.endsWith(`.${funcName}`),
+        ) ??
+        candidates.find((f) => f.name === funcName) ??
+        candidates[0] ??
+        null;
+
+      if (entryFunction) {
+        log.info(
+          `Entry function "${scenario.entryFunction}" not found by exact match, ` +
+          `using fuzzy match: ${entryFunction.qualifiedName}`
+        );
+      }
+    }
 
     if (!entryFunction) {
       throw new Error(

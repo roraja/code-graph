@@ -42,9 +42,9 @@ Five components: **core** (engines), **cli** (Commander.js), **server** (Express
     ^
 @codegraph/cli    <- depends on core
 @codegraph/server <- depends on core
-@codegraph/web    <- standalone SPA (connects to server via REST API at runtime)
+@codegraph/web    <- standalone SPA (connects to server via REST API + GraphQL at runtime)
 
-codegraph-navigator <- standalone VS Code extension (shells out to `codegraph` CLI, no code dependency on any package)
+codegraph-navigator <- standalone VS Code extension (imports @codegraph/core directly, no CLI subprocess dependency)
 ```
 
 ## Configuration Location
@@ -95,5 +95,5 @@ These apply everywhere in the codebase:
 | Config not found | `findProjectRoot()` looks for `.vscode/code-graph/codegraph.yaml` then `.codegraph.yaml` |
 | Web UI shows blank page | Build web: `cd packages/web && npm run build`, then `codegraph serve` |
 | Lint errors on test files | Tests are `.ts` not `.tsx` — check `--ext` flag matches |
-| VS Code extension shows empty views | Open Output panel → "CodeGraph Navigator" to see CLI bridge errors. Check `codegraph` is in PATH and Neo4j is running |
-| VS Code extension build fails | Run from extension dir: `cd codegraph-navigator && npm run build` (not the root `npm run build`) |
+| VS Code extension shows empty views | Open Output panel → "CodeGraph Navigator" to see errors. Check Neo4j is running (extension falls back to mock mode automatically) |
+| VS Code extension build fails | Run from extension dir: `cd codegraph-navigator && npm run build` (not the root `npm run build`). Requires `@codegraph/core` to be built first |

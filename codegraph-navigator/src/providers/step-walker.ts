@@ -9,7 +9,7 @@
  */
 
 import * as vscode from 'vscode';
-import { log } from '../logger.js';
+import { log, logEntry, logExit } from '../logger.js';
 import type { ScenarioStep, ScenarioView } from '@codegraph/core';
 
 /** Node types in the step walker tree */
@@ -72,20 +72,25 @@ export class StepWalkerProvider implements vscode.TreeDataProvider<WalkerNode> {
    * Load a scenario into the walker.
    */
   loadScenario(view: ScenarioView): void {
+    logEntry('StepWalkerProvider.loadScenario', { scenarioName: view.scenario.name, stepCount: view.steps.length });
     this.scenarioView = view;
     this.currentStepIndex = 0;
     this._onDidChangeTreeData.fire();
-    log('info', `Step walker loaded scenario: ${view.scenario.name}`, {
-      steps: view.steps.length,
-    });
+    logExit('StepWalkerProvider.loadScenario');
   }
 
   /**
    * Get the current step (for opening in editor).
    */
   getCurrentStep(): ScenarioStep | undefined {
-    if (!this.scenarioView) { return undefined; }
-    return this.scenarioView.steps[this.currentStepIndex];
+    logEntry('StepWalkerProvider.getCurrentStep');
+    if (!this.scenarioView) {
+      logExit('StepWalkerProvider.getCurrentStep', 'no scenario loaded');
+      return undefined;
+    }
+    const step = this.scenarioView.steps[this.currentStepIndex];
+    logExit('StepWalkerProvider.getCurrentStep', { stepNumber: step?.stepNumber });
+    return step;
   }
 
   /**
@@ -99,12 +104,17 @@ export class StepWalkerProvider implements vscode.TreeDataProvider<WalkerNode> {
    * Advance to the next step.
    */
   nextStep(): void {
-    if (!this.scenarioView) { return; }
+    logEntry('StepWalkerProvider.nextStep');
+    if (!this.scenarioView) {
+      logExit('StepWalkerProvider.nextStep', 'no scenario');
+      return;
+    }
     if (this.currentStepIndex < this.scenarioView.steps.length - 1) {
       this.currentStepIndex++;
       this._onDidChangeTreeData.fire();
-      log('debug', `Step walker: next -> step ${this.currentStepIndex + 1}`);
+      logExit('StepWalkerProvider.nextStep', { newStepIndex: this.currentStepIndex, stepNumber: this.currentStepIndex + 1 });
     } else {
+      logExit('StepWalkerProvider.nextStep', 'already at last step');
       vscode.window.showInformationMessage('CodeGraph: Already at the last step.');
     }
   }
@@ -113,12 +123,17 @@ export class StepWalkerProvider implements vscode.TreeDataProvider<WalkerNode> {
    * Go to the previous step.
    */
   prevStep(): void {
-    if (!this.scenarioView) { return; }
+    logEntry('StepWalkerProvider.prevStep');
+    if (!this.scenarioView) {
+      logExit('StepWalkerProvider.prevStep', 'no scenario');
+      return;
+    }
     if (this.currentStepIndex > 0) {
       this.currentStepIndex--;
       this._onDidChangeTreeData.fire();
-      log('debug', `Step walker: prev -> step ${this.currentStepIndex + 1}`);
+      logExit('StepWalkerProvider.prevStep', { newStepIndex: this.currentStepIndex, stepNumber: this.currentStepIndex + 1 });
     } else {
+      logExit('StepWalkerProvider.prevStep', 'already at first step');
       vscode.window.showInformationMessage('CodeGraph: Already at the first step.');
     }
   }
@@ -128,9 +143,15 @@ export class StepWalkerProvider implements vscode.TreeDataProvider<WalkerNode> {
   }
 
   async getChildren(element?: WalkerNode): Promise<WalkerNode[]> {
-    if (element) { return []; }
+    logEntry('StepWalkerProvider.getChildren');
+    if (element) {
+      logExit('StepWalkerProvider.getChildren', { count: 0 });
+      return [];
+    }
 
     if (!this.scenarioView || this.scenarioView.steps.length === 0) {
+      log('debug', 'StepWalkerProvider.getChildren: no scenario loaded');
+      logExit('StepWalkerProvider.getChildren', { count: 1, scenarioLoaded: false });
       return [
         new PropertyNode(
           'No scenario loaded',
@@ -141,7 +162,10 @@ export class StepWalkerProvider implements vscode.TreeDataProvider<WalkerNode> {
     }
 
     const step = this.scenarioView.steps[this.currentStepIndex];
-    if (!step) { return []; }
+    if (!step) {
+      logExit('StepWalkerProvider.getChildren', { count: 0 });
+      return [];
+    }
 
     const totalSteps = this.scenarioView.steps.length;
     const nodes: WalkerNode[] = [];
@@ -214,6 +238,7 @@ export class StepWalkerProvider implements vscode.TreeDataProvider<WalkerNode> {
       );
     }
 
+    logExit('StepWalkerProvider.getChildren', { count: nodes.length, scenarioLoaded: true });
     return nodes;
   }
 }

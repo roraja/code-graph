@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+#
+# cgrun — CodeGraph CLI runner with live logging
+#
+# Usage:
+#   ./scripts/cgrun discover --mock
+#   ./scripts/cgrun functions --list
+#
+# Logs are written to logs/cli_runs/NN-slug.md in real-time.
+# Use `tail -f logs/cli_runs/*.md` to watch all runs live.
+#
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOGS_DIR="$REPO_ROOT/logs/cli_runs"
+mkdir -p "$LOGS_DIR"
+
+if [ $# -eq 0 ]; then
+  echo "Usage: cgrun <command> [args...]"
+  echo "Example: cgrun discover --mock"
+  exit 1
+fi
+
+# Find next sequence number
+LAST_NUM=$(ls "$LOGS_DIR"/*.md 2>/dev/null \
+  | xargs -I{} basename {} \
+  | grep -oP '^\d+' \
+  | sort -n \
+  | tail -1 || echo "0")
+NEXT_NUM=$(printf "%02d" $(( 10#${LAST_NUM:-0} + 1 )))
+
+# Build slug from args
+SLUG=$(echo "$*" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/-\+/-/g' | sed 's/-$//')
+LOGFILE="$LOGS_DIR/${NEXT_NUM}-${SLUG}.md"
+
+# Write markdown header
+cat > "$LOGFILE" <<EOF
+# CLI Run: codegraph $*
+
+**Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+**Command**: \`codegraph $*\`
+**Log file**: \`${LOGFILE#$REPO_ROOT/}\`
+
+---
+
+\`\`\`
+EOF
+
+echo "📝 Logging to: $LOGFILE"
+echo "   tail -f $LOGFILE"
+echo ""
+
+# Run the CLI command with unbuffered output, tee to log file and terminal.
+# 'script' gives us a PTY so Node.js thinks it's a terminal (preserves colors/spinners).
+# 'stdbuf -oL' ensures line-buffered output for live tailing.
+EXIT_CODE=0
+script -qefc "node $REPO_ROOT/packages/cli/dist/index.js $*" /dev/null 2>&1 \
+  | stdbuf -oL tee -a "$LOGFILE" \
+  || EXIT_CODE=${PIPESTATUS[0]:-$?}
+
+# Close the markdown code block
+cat >> "$LOGFILE" <<EOF
+\`\`\`
+
+**Exit code**: $EXIT_CODE
+**Completed**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+EOF
+
+echo ""
+echo "✅ Log saved: $LOGFILE"
+exit $EXIT_CODE

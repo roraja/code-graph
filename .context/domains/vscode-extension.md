@@ -2,16 +2,16 @@
 
 ## Scope
 
-Lightweight VS Code sidebar extension that shells out to the globally installed `codegraph` CLI to explore scenarios, walk through execution traces, and browse functions. Located in `codegraph-navigator/` at the project root (intentionally separate from the npm workspace).
+Lightweight VS Code sidebar extension that imports `@codegraph/core` directly to explore scenarios, walk through execution traces, and browse functions. Located in `codegraph-navigator/` at the project root (intentionally separate from the npm workspace).
 
 ## Architecture
 
-The extension is a **thin UI layer** with zero dependency on `@codegraph/core`. All data comes from the `codegraph` CLI via subprocess calls (`execFile`). It parses JSON output from commands like `codegraph view <id> --format json` and `codegraph functions --format json`.
+The extension is a **thin UI layer** that depends on `@codegraph/core` as a library. It creates a `CodeGraphClient` instance (live DB or mock mode) via `core-bridge.ts` and uses the client API for all data access. No CLI subprocess calls.
 
 ```
 extension.ts        <- activate/deactivate, registers all commands
     |
-    +-- cli-bridge.ts   <- shells out to `codegraph` CLI, parses JSON/table output
+    +-- core-bridge.ts  <- creates CodeGraphClient from @codegraph/core, singleton pattern
     +-- logger.ts       <- OutputChannel + datewise file logging
     +-- decorations.ts  <- editor line highlights and inline annotations
     +-- providers/
@@ -24,18 +24,18 @@ extension.ts        <- activate/deactivate, registers all commands
 
 | File | Purpose |
 |------|---------|
-| `package.json` | Extension manifest — views, commands, menus, configuration, activation events |
+| `package.json` | Extension manifest — views, commands, menus, configuration, activation events. Version 0.4.0 |
 | `tsconfig.json` | TypeScript config (ES2022, Node16, separate from monorepo `tsconfig.base.json`) |
+| `esbuild.mjs` | esbuild bundler config for packaging the extension |
 | `media/codegraph-icon.svg` | Activity bar icon |
 | **Source** | |
-| `src/extension.ts` | Entry point. `activate()` registers 3 tree providers, 13 commands (showViewer, showOutput, refreshScenarios, viewScenario, walkScenario, nextStep, prevStep, openStepInEditor, refreshFunctions, searchFunctions, showScenariosForFunction, discoverFromFunction, showScenariosForSymbol, discoverFromSymbol). `deactivate()` disposes logger |
-| `src/cli-bridge.ts` | Subprocess bridge to `codegraph` CLI. `runCodeGraph(args)` executes with env `NO_COLOR=1 FORCE_COLOR=0`. `probeDB()` checks live DB availability, falls back to `--mock` mode. `listScenarios()` parses table output from `codegraph scenarios` using `extractIdsFromTable()` (strips ANSI, splits on Unicode `│` U+2502, handles truncated IDs with `…`). `getScenarioView(id)` calls `codegraph view <id> --format json`. `listFunctions()` calls `codegraph functions --format json`. `getScenariosForFunction()` filters by step function names. `discoverFromFunction()` runs `codegraph discover --hint` |
-| `src/logger.ts` | Dual logging: VS Code OutputChannel ("CodeGraph Navigator") and datewise files at `.vscode/code-graph/logs/YYYY-MM-DD.log`. `initLogger(workspaceRoot)`, `log(level, message, data?)`, `showOutputChannel()`, `disposeLogger()` |
-| `src/types.ts` | TypeScript types mirroring CLI JSON output: `Scenario`, `ScenarioStep`, `ScenarioView`, `FunctionInfo` |
-| `src/decorations.ts` | Editor decorations for step walking. `openStepInEditor()` highlights current step line with inline annotation, marks other steps in the same file with blue left-border. `extractFilePath()` resolves `functionId` format `filePath:startLine` to filesystem path |
+| `src/extension.ts` | Entry point. `activate()` registers 3 tree providers, 14 commands (showViewer, showOutput, refreshScenarios, viewScenario, walkScenario, nextStep, prevStep, openStepInEditor, refreshFunctions, searchFunctions, showScenariosForFunction, discoverFromFunction, showScenariosForSymbol, discoverFromSymbol). `deactivate()` disposes logger and core-bridge client. Helper functions: `loadAndWalk()`, `autoOpenCurrentStep()`, `getWordUnderCursor()` |
+| `src/core-bridge.ts` | Library bridge to `@codegraph/core`. Singleton `CodeGraphClient` via `getClient()`. `checkAvailability()` probes live DB, falls back to mock mode. Exports: `getClient()`, `resetConnection()`, `dispose()`, `listScenarios()`, `getScenarioView(id)`, `listFunctions(search?)`, `getScenariosForFunction(functionName)`, `discoverFromFunction(functionName)`. Re-exports types: `Scenario`, `ScenarioStep`, `ScenarioView`, `FunctionNode` (as `FunctionInfo`) |
+| `src/logger.ts` | Dual logging: VS Code OutputChannel ("CodeGraph Navigator") and datewise files at `.vscode/code-graph/logs/YYYY-MM-DD.log`. Exports: `initLogger(workspaceRoot)`, `getOutputChannel()`, `showOutputChannel()`, `log(level, message, data?)`, `disposeLogger()` |
+| `src/decorations.ts` | Editor decorations for step walking. `openStepInEditor()` highlights current step line with inline annotation, marks other steps in the same file with blue left-border. `clearDecorations(editor)` removes all highlights. Internal helper `extractFilePath()` resolves `functionId` format `filePath:startLine` to filesystem path |
 | `src/providers/scenarios.ts` | `ScenariosProvider` — tree view showing all scenarios (expandable to show steps). `ScenarioNode` with status icons, `StepPreviewNode` with action icons. Caches `ScenarioView` objects |
-| `src/providers/step-walker.ts` | `StepWalkerProvider` — tree view showing current step detail (scenario name, step header, function, action, line, source code, justification, confidence, variables, corrections). `nextStep()`, `prevStep()`, `getCurrentStep()`, `loadScenario()` |
-| `src/providers/functions.ts` | `FunctionsProvider` — tree view showing functions grouped by file (`FileGroupNode` → `FunctionNode`). Supports search filtering via `setSearch(query)` |
+| `src/providers/step-walker.ts` | `StepWalkerProvider` — tree view showing current step detail (scenario name, step header, function, action, line, source code, justification, confidence, variables, corrections). `nextStep()`, `prevStep()`, `getCurrentStep()`, `getScenarioView()`, `loadScenario()` |
+| `src/providers/functions.ts` | `FunctionsProvider` — tree view showing functions grouped by file (`FileGroupNode` → `FunctionNodeItem`). Supports search filtering via `setSearch(query)`. `getCachedFunctions()` for cached access |
 | **Config** | |
 | `LICENSE` | MIT license |
 | `.vscodeignore` | Excludes source/test files from VSIX |
@@ -65,14 +65,13 @@ extension.ts        <- activate/deactivate, registers all commands
 | `codegraph.searchFunctions` | CodeGraph: Search Functions | Functions view title bar |
 | `codegraph.showScenariosForFunction` | CodeGraph: Show Scenarios for Function | Function context menu |
 | `codegraph.discoverFromFunction` | CodeGraph: Discover Scenarios from Function | Function context menu |
-| `codegraph.showScenariosForSymbol` | CodeGraph: Show Scenarios for This Function | Editor right-click menu |
-| `codegraph.discoverFromSymbol` | CodeGraph: Discover Scenarios Starting from This Function | Editor right-click menu |
+| `codegraph.showScenariosForSymbol` | CodeGraph: Show Scenarios for This Function | Editor right-click menu (enablement: `editorHasSelection \|\| editorTextFocus`) |
+| `codegraph.discoverFromSymbol` | CodeGraph: Discover Scenarios Starting from This Function | Editor right-click menu (enablement: `editorHasSelection \|\| editorTextFocus`) |
 
 ## Settings
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `codegraph.cliPath` | string | `"codegraph"` | Path to the `codegraph` CLI binary |
 | `codegraph.autoOpenStep` | boolean | `true` | Auto-open source file when stepping |
 
 ## Build & Install
@@ -80,26 +79,24 @@ extension.ts        <- activate/deactivate, registers all commands
 ```bash
 cd codegraph-navigator
 npm install
-npm run build                          # tsc compile
+npm run build                          # tsc compile + esbuild bundle
 npx @vscode/vsce package --no-dependencies  # create .vsix
-code --install-extension codegraph-navigator-0.1.0.vsix
+code --install-extension codegraph-navigator-0.4.0.vsix
 ```
 
 VS Code tasks in `.vscode/tasks.json` wrap these commands:
 - **CodeGraph Navigator: Build & Install** — full pipeline (install → build → package → install VSIX)
-- **CodeGraph Navigator: Watch** — `tsc --watch` for development
+- **CodeGraph Navigator: Watch** — `esbuild --watch` for development
 - **Run CodeGraph Navigator Extension** — F5 launch config for Extension Development Host debugging
 
 ## Key Patterns
 
-- **CLI bridge, not library import**: The extension never imports `@codegraph/core`. It executes `codegraph` as a subprocess and parses stdout. This keeps it independent and ensures the CLI remains the primary interface
-- **DB probe + mock fallback**: On first use, `probeDB()` tests DB availability. If Neo4j is unreachable, all commands automatically append `--mock` for demo data
-- **ANSI stripping**: CLI output contains ANSI color codes from chalk even with `NO_COLOR=1`. `stripAnsi()` removes them before parsing JSON or table output
-- **Table ID reconstruction**: `codegraph scenarios` table output truncates long IDs with `…` (U+2026). The extension reads the Name column and regenerates the full ID using the same `generateId` algorithm as `ScenarioEngine`
+- **Core library import, not CLI subprocess**: The extension imports `@codegraph/core` directly and creates a `CodeGraphClient` via `core-bridge.ts`. This gives type-safe access to all core engines without parsing CLI stdout
+- **Singleton client + DB probe**: `getClient()` creates one `CodeGraphClient` instance. It probes the live DB first; if Neo4j is unreachable, it falls back to mock mode (built-in demo data)
+- **Type re-exports**: `core-bridge.ts` re-exports `Scenario`, `ScenarioStep`, `ScenarioView`, `FunctionNode` (as `FunctionInfo`) from `@codegraph/core` so providers don't import core directly
 - **OutputChannel logging**: All log entries go to both the VS Code "CodeGraph Navigator" output channel (visible in Output panel) and datewise files at `.vscode/code-graph/logs/`
+- **Editor decorations**: `openStepInEditor()` highlights the current step line (yellow background + annotation) and marks other steps in the same file (blue left border + hover tooltip)
 
 ## Known Limitations
 
-- The `codegraph scenarios` command has no `--format json` flag, so scenario listing requires fragile table parsing
-- The `codegraph functions` command may fail with "LIMIT: Invalid input '100.0'" on some Neo4j versions (Cypher integer type mismatch in core)
-- Extension activates only when workspace contains `.codegraph.yaml` (via `activationEvents`)
+- Extension activates only when workspace contains `.codegraph.yaml` (via `activationEvents`) — does not check `.vscode/code-graph/codegraph.yaml`

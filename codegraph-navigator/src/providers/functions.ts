@@ -12,7 +12,7 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import * as coreBridge from '../core-bridge.js';
-import { log } from '../logger.js';
+import { log, logEntry, logExit } from '../logger.js';
 import type { FunctionNode } from '@codegraph/core';
 
 /** A node in the functions tree — either a file group or a function */
@@ -85,16 +85,18 @@ export class FunctionsProvider implements vscode.TreeDataProvider<FunctionTreeNo
   private cachedFunctions: FunctionNode[] = [];
 
   refresh(): void {
+    logEntry('FunctionsProvider.refresh');
     this.cachedFunctions = [];
     this._onDidChangeTreeData.fire();
-    log('info', 'Functions tree refreshed');
+    logExit('FunctionsProvider.refresh');
   }
 
   setSearch(query: string | undefined): void {
+    logEntry('FunctionsProvider.setSearch', { query });
     this.searchQuery = query;
     this.cachedFunctions = [];
     this._onDidChangeTreeData.fire();
-    log('info', 'Functions search updated', { query });
+    logExit('FunctionsProvider.setSearch');
   }
 
   /**
@@ -110,17 +112,23 @@ export class FunctionsProvider implements vscode.TreeDataProvider<FunctionTreeNo
 
   async getChildren(element?: FunctionTreeNode): Promise<FunctionTreeNode[]> {
     if (element instanceof FileGroupNode) {
-      return element.functions.map((f) => new FunctionNodeItem(f));
+      logEntry('FunctionsProvider.getChildren', { elementType: 'fileGroup', filePath: element.filePath });
+      const items = element.functions.map((f) => new FunctionNodeItem(f));
+      logExit('FunctionsProvider.getChildren', { count: items.length });
+      return items;
     }
 
     if (element) {
+      logExit('FunctionsProvider.getChildren', { count: 0 });
       return [];
     }
 
+    logEntry('FunctionsProvider.getChildren', { elementType: 'root' });
     // Root — load functions and group by file
     try {
       if (this.cachedFunctions.length === 0) {
         this.cachedFunctions = await coreBridge.listFunctions(this.searchQuery);
+        log('debug', 'FunctionsProvider.getChildren: loaded functions', { count: this.cachedFunctions.length });
       }
 
       const byFile = new Map<string, FunctionNode[]>();
@@ -135,13 +143,16 @@ export class FunctionsProvider implements vscode.TreeDataProvider<FunctionTreeNo
         a[0].localeCompare(b[0])
       );
 
-      return sortedFiles.map(
+      const result = sortedFiles.map(
         ([filePath, funcs]) => new FileGroupNode(filePath, funcs)
       );
+      logExit('FunctionsProvider.getChildren', { functionsLoaded: this.cachedFunctions.length, fileGroups: result.length });
+      return result;
     } catch (err) {
       log('error', 'Failed to load functions for tree', {
         error: err instanceof Error ? err.message : String(err),
       });
+      logExit('FunctionsProvider.getChildren', { count: 0, error: true });
       return [];
     }
   }

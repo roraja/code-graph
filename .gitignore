@@ -6,9 +6,10 @@ dist/
 *.tsbuildinfo
 
 # === IDE / Editor ===
-.vscode/
-!.vscode/settings.json
-!.vscode/extensions.json
+.vscode/code-explorer-logs
+# !.vscode/settings.json
+# !.vscode/extensions.json
+# !.vscode/tasks.json
 .idea/
 *.swp
 *.swo

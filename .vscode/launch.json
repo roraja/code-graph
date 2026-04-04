@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run CodeGraph Navigator Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/codegraph-navigator"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/codegraph-navigator/dist/**/*.js"
+      ],
+      "preLaunchTask": "CodeGraph Navigator: Build"
+    }
+  ]
+}

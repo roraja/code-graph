@@ -12,7 +12,15 @@ import {
   type AIConfig,
   type ChatMessage,
 } from './agent.js';
-import { ScenarioDiscoveryAgent, type ScenarioDiscoveryInput } from './scenario-discovery.js';
+import {
+  ScenarioDiscoveryAgent,
+  type ScenarioDiscoveryInput,
+  type CallEdgeSummary,
+  type BranchSummary,
+  type ClassSummary,
+  type InheritanceSummary,
+  type CodebaseSummary,
+} from './scenario-discovery.js';
 import { PathTracerAgent, type PathTraceInput } from './path-tracer.js';
 import { VariableImaginerAgent, type VariableImaginationInput } from './variable-imaginer.js';
 import { JustifierAgent, type JustificationRequest } from './justifier.js';
@@ -241,6 +249,287 @@ describe('ScenarioDiscoveryAgent', () => {
     const userContent = lastMessages.find((m) => m.role === 'user')?.content ?? '';
     expect(userContent).toContain('existing');
     expect(userContent).toContain('Already discovered');
+  });
+
+  it('includes call graph edges in the prompt', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([
+      {
+        id: 'login-flow',
+        name: 'Login Flow',
+        description: 'User logs in',
+        entryFunction: 'handleLogin',
+        triggerCondition: 'POST /login',
+        confidence: 0.9,
+        expectedPath: ['handleLogin', 'validateCredentials', 'generateToken'],
+        category: 'authentication',
+        pathType: 'happy',
+      },
+    ]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    const callGraph: CallEdgeSummary[] = [
+      { caller: 'handleLogin', callee: 'validateCredentials' },
+      { caller: 'handleLogin', callee: 'generateToken' },
+      { caller: 'validateCredentials', callee: 'hashPassword', isVirtualDispatch: true },
+    ];
+
+    const scenarios = await agent.discover({
+      entryPoints: [
+        { id: 'f1', name: 'handleLogin', signature: 'handleLogin(): void', filePath: 'src/auth.ts' },
+      ],
+      eventHandlers: [],
+      publicAPIs: [],
+      callGraph,
+    });
+
+    // Verify call graph was included in the prompt
+    const userContent = mock.receivedMessages[0].find((m) => m.role === 'user')?.content ?? '';
+    expect(userContent).toContain('Call Graph');
+    expect(userContent).toContain('handleLogin');
+    expect(userContent).toContain('validateCredentials');
+    expect(userContent).toContain('virtual dispatch');
+
+    // Verify new optional fields are parsed
+    expect(scenarios[0].expectedPath).toEqual(['handleLogin', 'validateCredentials', 'generateToken']);
+    expect(scenarios[0].category).toBe('authentication');
+    expect(scenarios[0].pathType).toBe('happy');
+  });
+
+  it('includes branch points in the prompt', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([
+      {
+        id: 'invalid-login',
+        name: 'Invalid Login',
+        description: 'User provides wrong password',
+        entryFunction: 'handleLogin',
+        triggerCondition: 'POST /login with wrong password',
+        confidence: 0.85,
+        pathType: 'error',
+      },
+    ]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    const branchPoints: BranchSummary[] = [
+      {
+        functionName: 'handleLogin',
+        type: 'if',
+        condition: 'isValid === false',
+        line: 25,
+        hasElse: true,
+      },
+      {
+        functionName: 'handleLogin',
+        type: 'if',
+        condition: 'user.isLocked',
+        line: 30,
+        hasElse: false,
+      },
+    ];
+
+    const scenarios = await agent.discover({
+      entryPoints: [
+        { id: 'f1', name: 'handleLogin', signature: 'handleLogin(): void', filePath: 'src/auth.ts' },
+      ],
+      eventHandlers: [],
+      publicAPIs: [],
+      branchPoints,
+    });
+
+    const userContent = mock.receivedMessages[0].find((m) => m.role === 'user')?.content ?? '';
+    expect(userContent).toContain('Decision Points');
+    expect(userContent).toContain('isValid === false');
+    expect(userContent).toContain('has else');
+    expect(userContent).toContain('user.isLocked');
+    expect(userContent).toContain('no else');
+
+    expect(scenarios[0].pathType).toBe('error');
+  });
+
+  it('includes class hierarchy in the prompt', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([
+      {
+        id: 'stripe-payment',
+        name: 'Stripe Payment',
+        description: 'Process payment via Stripe',
+        entryFunction: 'processPayment',
+        triggerCondition: 'User submits payment',
+        confidence: 0.88,
+      },
+    ]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    const classes: ClassSummary[] = [
+      {
+        name: 'PaymentProcessor',
+        isAbstract: true,
+        isInterface: false,
+        methods: ['process', 'refund'],
+        filePath: 'src/payment/base.ts',
+        documentation: 'Base class for payment processing',
+      },
+      {
+        name: 'StripeProcessor',
+        isAbstract: false,
+        isInterface: false,
+        methods: ['process', 'refund', 'createIntent'],
+        filePath: 'src/payment/stripe.ts',
+      },
+    ];
+    const inheritances: InheritanceSummary[] = [
+      { child: 'StripeProcessor', parent: 'PaymentProcessor', type: 'extends' },
+    ];
+
+    await agent.discover({
+      entryPoints: [
+        { id: 'f1', name: 'processPayment', signature: 'processPayment(): void', filePath: 'src/pay.ts' },
+      ],
+      eventHandlers: [],
+      publicAPIs: [],
+      classes,
+      inheritances,
+    });
+
+    const userContent = mock.receivedMessages[0].find((m) => m.role === 'user')?.content ?? '';
+    expect(userContent).toContain('Class Hierarchy');
+    expect(userContent).toContain('PaymentProcessor');
+    expect(userContent).toContain('abstract class');
+    expect(userContent).toContain('StripeProcessor');
+    expect(userContent).toContain('extends');
+    expect(userContent).toContain('Base class for payment processing');
+  });
+
+  it('includes codebase summary in the prompt', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    const codebaseSummary: CodebaseSummary = {
+      projectDescription: 'An e-commerce REST API backend',
+      languages: ['TypeScript'],
+      totalFunctions: 150,
+      totalClasses: 25,
+      totalFiles: 40,
+      moduleGroups: ['src/auth/', 'src/products/', 'src/orders/'],
+    };
+
+    await agent.discover({
+      entryPoints: [
+        { id: 'f1', name: 'main', signature: 'main(): void', filePath: 'src/index.ts' },
+      ],
+      eventHandlers: [],
+      publicAPIs: [],
+      codebaseSummary,
+    });
+
+    const userContent = mock.receivedMessages[0].find((m) => m.role === 'user')?.content ?? '';
+    expect(userContent).toContain('Codebase Overview');
+    expect(userContent).toContain('e-commerce REST API');
+    expect(userContent).toContain('TypeScript');
+    expect(userContent).toContain('Functions: 150');
+    expect(userContent).toContain('src/auth/');
+    expect(userContent).toContain('src/orders/');
+  });
+
+  it('includes structured parameter info in the prompt', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    await agent.discover({
+      entryPoints: [
+        {
+          id: 'f1',
+          name: 'createOrder',
+          qualifiedName: 'OrderService.createOrder',
+          signature: 'createOrder(items: Item[], coupon?: string): Promise<Order>',
+          filePath: 'src/orders.ts',
+          isAsync: true,
+          parameters: [
+            { name: 'items', type: 'Item[]', isOptional: false },
+            { name: 'coupon', type: 'string', isOptional: true, defaultValue: 'undefined' },
+          ],
+        },
+      ],
+      eventHandlers: [],
+      publicAPIs: [],
+    });
+
+    const userContent = mock.receivedMessages[0].find((m) => m.role === 'user')?.content ?? '';
+    expect(userContent).toContain('Parameters:');
+    expect(userContent).toContain('`items: Item[]`');
+    expect(userContent).toContain('`coupon: string`');
+    expect(userContent).toContain('(optional)');
+    expect(userContent).toContain('async');
+  });
+
+  it('system prompt includes quality guidelines', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    await agent.discover({
+      entryPoints: [
+        { id: 'f1', name: 'main', signature: 'main(): void', filePath: 'src/index.ts' },
+      ],
+      eventHandlers: [],
+      publicAPIs: [],
+    });
+
+    const systemContent = mock.receivedMessages[0].find((m) => m.role === 'system')?.content ?? '';
+    expect(systemContent).toContain('GOOD scenario');
+    expect(systemContent).toContain('BAD scenario');
+    expect(systemContent).toContain('Diversity requirements');
+    expect(systemContent).toContain('Analysis strategy');
+    expect(systemContent).toContain('expectedPath');
+    expect(systemContent).toContain('pathType');
+    expect(systemContent).toContain('category');
+  });
+
+  it('normalises pathType values correctly', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([
+      {
+        id: 'a',
+        name: 'A',
+        description: 'test',
+        entryFunction: 'f',
+        triggerCondition: 'x',
+        confidence: 0.9,
+        pathType: 'edge_case',
+      },
+      {
+        id: 'b',
+        name: 'B',
+        description: 'test',
+        entryFunction: 'f',
+        triggerCondition: 'x',
+        confidence: 0.8,
+        pathType: 'HAPPY',
+      },
+      {
+        id: 'c',
+        name: 'C',
+        description: 'test',
+        entryFunction: 'f',
+        triggerCondition: 'x',
+        confidence: 0.7,
+        pathType: 'unknown',
+      },
+    ]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    const scenarios = await agent.discover({
+      entryPoints: [{ id: 'f1', name: 'f', signature: 'f(): void', filePath: 'a.ts' }],
+      eventHandlers: [],
+      publicAPIs: [],
+    });
+
+    expect(scenarios[0].pathType).toBe('edge-case');
+    expect(scenarios[1].pathType).toBe('happy');
+    expect(scenarios[2].pathType).toBeUndefined();
   });
 });
 

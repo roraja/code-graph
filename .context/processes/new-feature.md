@@ -53,12 +53,12 @@ Load: `.context/domains/web.md`
 
 Load: `.context/domains/vscode-extension.md`
 
-If the feature adds new CLI commands with `--format json` output, consider exposing them in the VS Code extension:
+If the feature adds new methods to `CodeGraphClient` (in `packages/core/src/api.ts`), consider exposing them in the VS Code extension:
 
-1. Add new CLI bridge functions in `codegraph-navigator/src/cli-bridge.ts`
+1. Add wrapper functions in `codegraph-navigator/src/core-bridge.ts` that call the client
 2. Add tree data providers or commands in `codegraph-navigator/src/`
 3. Register new commands in `codegraph-navigator/src/extension.ts` and `package.json`
-4. Build and install: `cd codegraph-navigator && npm run build && npx @vscode/vsce package --no-dependencies && code --install-extension codegraph-navigator-0.1.0.vsix`
+4. Build and install: `cd codegraph-navigator && npm run build && npx @vscode/vsce package --no-dependencies && code --install-extension codegraph-navigator-0.4.0.vsix`
 
 ### Step 7: Test
 
