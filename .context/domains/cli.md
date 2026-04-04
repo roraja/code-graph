@@ -74,3 +74,12 @@ export function registerXxxCommand(program: Command): void {
 ## Adding a New Command
 
 See `processes/add-cli-command.md`.
+
+## Discover Command Notes
+
+The `discover` command has special handling for the Copilot CLI provider:
+
+- **Minimal prompts**: Does NOT embed function source code in the prompt. Sends only function names, signatures, and file paths. Copilot uses its own tools (search, read) to explore the codebase.
+- **C++ support**: Falls back to using all functions when no exported functions exist (C++ codebases don't mark functions as exported).
+- **Hint-based search**: When `--hint` is provided, extracts the function name and searches the graph DB for matching functions to prioritize in the prompt.
+- **Output file pattern**: The CopilotCLIProvider instructs copilot to write JSON to a temp file, which is read back after execution for reliable response parsing.

@@ -13,12 +13,13 @@ import {
   createCodeGraphClient,
   type CodeGraphClient,
   type ScenarioView,
+  type CallRelation,
 } from '@codegraph/core';
 import type { Scenario, ScenarioStep, FunctionNode } from '@codegraph/core';
 import { log, logEntry, logExit, logError } from './logger.js';
 
 /** Re-export types so the rest of the extension imports from here or @codegraph/core. */
-export type { Scenario, ScenarioStep, ScenarioView, FunctionNode as FunctionInfo };
+export type { Scenario, ScenarioStep, ScenarioView, CallRelation, FunctionNode as FunctionInfo };
 
 /** The singleton client instance. */
 let client: CodeGraphClient | null = null;
@@ -195,6 +196,42 @@ export async function getScenariosForFunction(
 }
 
 /**
+ * Find all functions that call the given function.
+ */
+export async function getCallers(
+  functionName: string,
+): Promise<CallRelation[]> {
+  logEntry('coreBridge.getCallers', { functionName });
+  try {
+    const c = await getClient();
+    const callers = await c.getCallers(functionName);
+    logExit('coreBridge.getCallers', { count: callers.length });
+    return callers;
+  } catch (err) {
+    logError('coreBridge.getCallers', err);
+    return [];
+  }
+}
+
+/**
+ * Find all functions called by the given function.
+ */
+export async function getCallees(
+  functionName: string,
+): Promise<CallRelation[]> {
+  logEntry('coreBridge.getCallees', { functionName });
+  try {
+    const c = await getClient();
+    const callees = await c.getCallees(functionName);
+    logExit('coreBridge.getCallees', { count: callees.length });
+    return callees;
+  } catch (err) {
+    logError('coreBridge.getCallees', err);
+    return [];
+  }
+}
+
+/**
  * Discover scenarios starting from a function.
  */
 export async function discoverFromFunction(
@@ -218,6 +255,36 @@ export async function discoverFromFunction(
     vscode.window.showErrorMessage(
       `CodeGraph: Discovery failed — ${message}`,
     );
+  }
+}
+
+/**
+ * Trace a scenario to generate step-by-step execution walkthrough.
+ * Reads the entry function, follows calls, asks AI to decide branches
+ * and virtual dispatch, and saves the resulting steps to the graph.
+ *
+ * @returns The trace result with steps and metrics, or null on failure.
+ */
+export async function traceScenario(
+  scenarioId: string,
+): Promise<{ steps: number; durationMs: number } | null> {
+  logEntry('coreBridge.traceScenario', { scenarioId });
+  try {
+    const c = await getClient();
+    const result = await c.traceScenario(scenarioId);
+    const summary = {
+      steps: result.steps.length,
+      durationMs: result.durationMs,
+    };
+    logExit('coreBridge.traceScenario', summary);
+    return summary;
+  } catch (err) {
+    logError('coreBridge.traceScenario', err);
+    const message = err instanceof Error ? err.message : String(err);
+    vscode.window.showErrorMessage(
+      `CodeGraph: Trace failed — ${message}`,
+    );
+    return null;
   }
 }
 

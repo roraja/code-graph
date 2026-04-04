@@ -2,7 +2,13 @@
  * `codegraph discover` — Discover scenarios in the indexed codebase.
  *
  * Uses the ScenarioDiscoveryAgent to identify likely user-facing scenarios,
- * then displays them in a formatted table.
+ * saves them to the graph, then automatically traces each scenario to
+ * generate step-by-step execution data.
+ *
+ * When the AI provider is the Copilot CLI, the prompt is kept minimal
+ * (just the user hint and function names) so copilot can search the
+ * codebase itself using its tools. Function source code is NOT embedded
+ * in the prompt — copilot reads it directly from disk.
  *
  * @module cli/commands/discover
  */
@@ -14,9 +20,34 @@ import {
   loadFullContext,
   handleError,
   startSpinner,
+  formatDuration,
   gracefulExit,
   printHeader,
 } from '../helpers.js';
+
+/**
+ * Extract a likely function name from a discovery hint.
+ *
+ * Supports patterns like:
+ *   - "GetUrlFromHDrop function in ui/base/clipboard/clipboard_util_win.cc:77"
+ *   - "ClassName::MethodName"
+ *   - "functionName"
+ */
+function extractFunctionNameFromHint(hint: string): string | null {
+  // Try "FunctionName function in ..." pattern
+  const funcInMatch = hint.match(/^(\S+)\s+function\s+in\s+/i);
+  if (funcInMatch) return funcInMatch[1];
+
+  // Try first word if it looks like a qualified name (contains ::)
+  const qualifiedMatch = hint.match(/(\w+(?:::\w+)+)/);
+  if (qualifiedMatch) return qualifiedMatch[1];
+
+  // Try first word if it looks like a function name (PascalCase or camelCase)
+  const firstWord = hint.split(/\s+/)[0];
+  if (firstWord && /^[A-Za-z_]\w*$/.test(firstWord)) return firstWord;
+
+  return null;
+}
 
 /**
  * Register the `discover` command on the CLI program.
@@ -29,6 +60,7 @@ export function registerDiscoverCommand(program: Command): void {
     .description('Discover scenarios in the indexed codebase')
     .option('--hint <text>', 'Provide a hint to guide discovery')
     .option('--count <n>', 'Maximum number of scenarios to discover', '5')
+    .option('--no-trace', 'Skip automatic tracing of discovered scenarios')
     .action(async (opts, cmd) => {
       const verbose = cmd.parent?.opts().verbose ?? false;
       const configPath = cmd.parent?.opts().config;
@@ -38,18 +70,39 @@ export function registerDiscoverCommand(program: Command): void {
 
         const spinner = startSpinner('Analyzing codebase for scenarios...');
 
-        // Gather entry points from the graph
-        const functions = await ctx.queryEngine.searchFunctions('', 100);
+        // Build a lightweight list of function names from the graph.
+        // We do NOT include source code or full details — the AI provider
+        // (Copilot CLI) will search/read the codebase itself using its tools.
+        // This keeps the prompt small and lets copilot do deep analysis.
+        const allFunctions = await ctx.queryEngine.searchFunctions('', 100);
 
-        const entryPoints = functions
-          .filter((f) => f.isExported)
-          .map((f) => ({
-            id: f.id,
-            name: f.qualifiedName,
-            signature: f.signature,
-            filePath: f.filePath,
-            documentation: f.documentation,
-          }));
+        // If a hint is provided, also search for hint-related functions
+        let hintFunctions: typeof allFunctions = [];
+        if (opts.hint) {
+          const funcName = extractFunctionNameFromHint(opts.hint);
+          if (funcName) {
+            hintFunctions = await ctx.queryEngine.searchFunctions(funcName, 20);
+          }
+        }
+
+        // Merge: hint functions first, then general (deduplicated)
+        const seenIds = new Set<string>();
+        const mergedFunctions = [...hintFunctions, ...allFunctions].filter(
+          (f) => {
+            if (seenIds.has(f.id)) return false;
+            seenIds.add(f.id);
+            return true;
+          }
+        );
+
+        // Send minimal function info: name, signature, file path only.
+        // No source code — copilot reads files directly.
+        const entryPoints = mergedFunctions.map((f) => ({
+          id: f.id,
+          name: f.qualifiedName || f.name,
+          signature: f.signature,
+          filePath: f.filePath,
+        }));
 
         const scenarios = await ctx.discoveryAgent.discover({
           entryPoints,
@@ -68,10 +121,14 @@ export function registerDiscoverCommand(program: Command): void {
           return;
         }
 
+        const maxCount = parseInt(opts.count, 10);
+        const toProcess = scenarios.slice(0, maxCount);
+
         // Save discovered scenarios to the graph
         const saveSpinner = startSpinner('Saving scenarios...');
-        for (const s of scenarios.slice(0, parseInt(opts.count, 10))) {
-          await ctx.scenarioEngine.createScenario({
+        const savedIds: string[] = [];
+        for (const s of toProcess) {
+          const created = await ctx.scenarioEngine.createScenario({
             name: s.name,
             description: s.description,
             entryFunction: s.entryFunction,
@@ -79,10 +136,52 @@ export function registerDiscoverCommand(program: Command): void {
             discoveredBy: 'ai',
             confidence: s.confidence,
           });
+          savedIds.push(created.id);
         }
-        saveSpinner.succeed('Scenarios saved to graph');
+        saveSpinner.succeed(`${savedIds.length} scenarios saved to graph`);
+
+        // Auto-trace each discovered scenario (unless --no-trace)
+        if (opts.trace !== false) {
+          console.log();
+          printHeader('Tracing Scenarios');
+
+          for (let i = 0; i < savedIds.length; i++) {
+            const scenarioId = savedIds[i];
+            const scenario = await ctx.scenarioEngine.getScenario(scenarioId);
+            if (!scenario) continue;
+
+            const traceSpinner = startSpinner(
+              `[${i + 1}/${savedIds.length}] Tracing: ${scenario.name}...`
+            );
+            const startTime = Date.now();
+
+            try {
+              const result = await ctx.scenarioTracer.trace(scenario, {
+                maxDepth: 50,
+              });
+
+              await ctx.scenarioEngine.saveSteps(scenarioId, result.steps);
+
+              const duration = Date.now() - startTime;
+              traceSpinner.succeed(
+                `[${i + 1}/${savedIds.length}] ${scenario.name} — ` +
+                `${result.steps.length} steps, ` +
+                `${result.functionsTraversed} functions, ` +
+                `${result.branchDecisions} branches ` +
+                `(${formatDuration(duration)})`
+              );
+            } catch (traceErr) {
+              const msg = traceErr instanceof Error ? traceErr.message : String(traceErr);
+              traceSpinner.fail(
+                `[${i + 1}/${savedIds.length}] ${scenario.name} — trace failed: ${msg}`
+              );
+              // Continue to next scenario — don't abort the whole run
+            }
+          }
+        }
 
         // Display table
+        console.log();
         printHeader('Discovered Scenarios');
         const table = new Table({
           head: [
@@ -95,7 +194,7 @@ export function registerDiscoverCommand(program: Command): void {
           wordWrap: true,
         });
 
-        for (const s of scenarios.slice(0, parseInt(opts.count, 10))) {
+        for (const s of toProcess) {
           const confidence = (s.confidence * 100).toFixed(0) + '%';
           const confColor =
             s.confidence >= 0.8

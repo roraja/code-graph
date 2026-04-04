@@ -23,7 +23,7 @@ import { ScenariosProvider } from './providers/scenarios.js';
 import { StepWalkerProvider } from './providers/step-walker.js';
 import { FunctionsProvider } from './providers/functions.js';
 import { openStepInEditor } from './decorations.js';
-import type { ScenarioStep } from '@codegraph/core';
+import type { ScenarioStep, CallRelation } from '@codegraph/core';
 
 export function activate(context: vscode.ExtensionContext): void {
   logEntry('activate', { extensionVersion: context.extension.packageJSON?.version });
@@ -220,6 +220,32 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Trace scenario (from tree context menu)
+  log('debug', 'Registering command: codegraph.traceScenario');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.traceScenario', async (node: { scenario: { id: string; name: string } }) => {
+      const scenarioId = node?.scenario?.id;
+      const scenarioName = node?.scenario?.name ?? scenarioId;
+      logEntry('cmd:traceScenario', { scenarioId });
+      try {
+        if (!scenarioId) {
+          const input = await vscode.window.showInputBox({
+            prompt: 'Enter scenario ID to trace',
+            placeHolder: 'e.g., user-login-flow',
+          });
+          if (!input) { logExit('cmd:traceScenario', 'cancelled'); return; }
+          await runTrace(input, input, scenariosProvider, stepWalkerProvider);
+        } else {
+          await runTrace(scenarioId, scenarioName, scenariosProvider, stepWalkerProvider);
+        }
+        logExit('cmd:traceScenario');
+      } catch (err) {
+        logError('cmd:traceScenario', err);
+        throw err;
+      }
+    })
+  );
+
   // Show scenarios for function (from tree context menu)
   log('debug', 'Registering command: codegraph.showScenariosForFunction');
   context.subscriptions.push(
@@ -360,6 +386,76 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Find callers of symbol (editor right-click)
+  log('debug', 'Registering command: codegraph.findCallers');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.findCallers', async () => {
+      logEntry('cmd:findCallers');
+      try {
+        const functionName = getWordUnderCursor();
+        if (!functionName) {
+          vscode.window.showWarningMessage('CodeGraph: Place cursor on a function name first.');
+          logExit('cmd:findCallers', 'no word under cursor');
+          return;
+        }
+        log('info', 'Find callers of symbol', { functionName });
+
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `Finding callers of "${functionName}"...` },
+          async () => {
+            const callers = await coreBridge.getCallers(functionName);
+            if (callers.length === 0) {
+              vscode.window.showInformationMessage(
+                `No callers found for "${functionName}".`
+              );
+              return;
+            }
+            await showCallRelationQuickPick(callers, `Callers of "${functionName}"`);
+          }
+        );
+        logExit('cmd:findCallers');
+      } catch (err) {
+        logError('cmd:findCallers', err);
+        throw err;
+      }
+    })
+  );
+
+  // Find callees of symbol (editor right-click)
+  log('debug', 'Registering command: codegraph.findCallees');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.findCallees', async () => {
+      logEntry('cmd:findCallees');
+      try {
+        const functionName = getWordUnderCursor();
+        if (!functionName) {
+          vscode.window.showWarningMessage('CodeGraph: Place cursor on a function name first.');
+          logExit('cmd:findCallees', 'no word under cursor');
+          return;
+        }
+        log('info', 'Find callees of symbol', { functionName });
+
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `Finding callees of "${functionName}"...` },
+          async () => {
+            const callees = await coreBridge.getCallees(functionName);
+            if (callees.length === 0) {
+              vscode.window.showInformationMessage(
+                `No callees found for "${functionName}".`
+              );
+              return;
+            }
+            await showCallRelationQuickPick(callees, `Callees of "${functionName}"`);
+          }
+        );
+        logExit('cmd:findCallees');
+      } catch (err) {
+        logError('cmd:findCallees', err);
+        throw err;
+      }
+    })
+  );
+
   // Clean up on deactivation
   context.subscriptions.push({
     dispose: () => {
@@ -382,6 +478,45 @@ export function deactivate(): void {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Trace a scenario and reload the updated view in the Step Walker.
+ */
+async function runTrace(
+  scenarioId: string,
+  scenarioName: string,
+  scenariosProvider: ScenariosProvider,
+  stepWalkerProvider: StepWalkerProvider
+): Promise<void> {
+  logEntry('runTrace', { scenarioId });
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Tracing scenario "${scenarioName}"...`,
+      cancellable: false,
+    },
+    async () => {
+      const result = await coreBridge.traceScenario(scenarioId);
+      if (!result) {
+        log('warn', 'runTrace: trace returned null', { scenarioId });
+        logExit('runTrace', 'failed');
+        return;
+      }
+
+      log('info', 'runTrace: trace complete', { scenarioId, ...result });
+
+      vscode.window.showInformationMessage(
+        `CodeGraph: Traced "${scenarioName}" — ${result.steps} step(s) in ${result.durationMs}ms.`
+      );
+
+      // Refresh the scenarios tree and reload the traced scenario in the walker
+      scenariosProvider.refresh();
+      await loadAndWalk(scenarioId, scenariosProvider, stepWalkerProvider);
+    }
+  );
+  logExit('runTrace');
+}
 
 /**
  * Load a scenario and display it in the Step Walker.
@@ -460,4 +595,45 @@ function getWordUnderCursor(): string | undefined {
   const word = editor.document.getText(wordRange);
   logExit('getWordUnderCursor', word);
   return word;
+}
+
+/**
+ * Show a QuickPick list of call relations (callers or callees) and
+ * navigate to the selected function in the editor.
+ */
+async function showCallRelationQuickPick(
+  relations: CallRelation[],
+  title: string
+): Promise<void> {
+  logEntry('showCallRelationQuickPick', { title, count: relations.length });
+
+  const items = relations.map((rel) => ({
+    label: rel.function.qualifiedName,
+    description: `${rel.filePath}:${rel.line}`,
+    detail: rel.callExpression,
+    relation: rel,
+  }));
+
+  const picked = await vscode.window.showQuickPick(items, {
+    placeHolder: title,
+    matchOnDescription: true,
+    matchOnDetail: true,
+  });
+
+  if (picked) {
+    log('info', 'Opening call relation', {
+      qualifiedName: picked.relation.function.qualifiedName,
+      filePath: picked.relation.filePath,
+      line: picked.relation.line,
+    });
+
+    const uri = vscode.Uri.file(picked.relation.filePath);
+    const line = Math.max(0, picked.relation.line - 1);
+    await vscode.window.showTextDocument(uri, {
+      selection: new vscode.Range(line, 0, line, 0),
+      preview: false,
+    });
+  }
+
+  logExit('showCallRelationQuickPick');
 }

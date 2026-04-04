@@ -10,3 +10,13 @@ In the code graph web UI allow me to for a given function if I click open in VS 
 # Next
 --
 Refactor so that code-graph exposes JS as npm package which the vscode extension consumes. Maybe it can directly refer the JS API since its a mono-repo. Have a clear exports endpoint for the JS app, dont import from anyever.
+
+--
+I want to discover scenarios related to "GetUrlFromHDrop function in ui/base/clipboard/clipboard_util_win.cc:77" in /workspace/cr1/src.
+
+Currently, I tried running in /workspace/cr1/src:
+
+codegraph discover --hint "GetUrlFromHDrop function in ui/base/clipboard/clipboard_util_win.cc:77" 
+
+but it fails for some reason. Can you check and fix all the issues until you are able to generate scenariios related to this function (using the CLI tool as if a user was using it). Find and fix the issues.
+---

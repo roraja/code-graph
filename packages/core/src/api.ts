@@ -15,7 +15,7 @@
 import { GraphDriver } from './graph/driver.js';
 import { GraphSchema } from './graph/schema.js';
 import { CodeIndexer } from './graph/indexer.js';
-import { QueryEngine } from './graph/queries.js';
+import { QueryEngine, type CallRelation } from './graph/queries.js';
 import { ScenarioEngine, type Scenario, type ScenarioStep, type CreateScenarioInput } from './scenario/engine.js';
 import { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
 import { CorrectionEngine, type Correction, type StructuredCorrection } from './correction/engine.js';
@@ -365,6 +365,36 @@ function getMockFunctions(): FunctionNode[] {
   ];
 }
 
+function getMockCallRelations(
+  functionName: string,
+  direction: 'callers' | 'callees',
+): CallRelation[] {
+  const mockFuncs = getMockFunctions();
+  const target = mockFuncs.find(
+    (f) =>
+      f.name === functionName ||
+      f.qualifiedName === functionName ||
+      f.qualifiedName.includes(functionName),
+  );
+  if (!target) return [];
+
+  // Return a plausible mock relation using another mock function
+  const other = mockFuncs.find((f) => f.id !== target.id);
+  if (!other) return [];
+
+  return [
+    {
+      function: direction === 'callers' ? other : other,
+      filePath: direction === 'callers' ? other.filePath : target.filePath,
+      line: direction === 'callers' ? other.startLine : target.startLine + 5,
+      callExpression:
+        direction === 'callers'
+          ? `${target.name}(...)`
+          : `${other.name}(...)`,
+    },
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // CodeGraphClient
 // ---------------------------------------------------------------------------
@@ -605,6 +635,46 @@ export class CodeGraphClient {
     return this.queryEngine!.searchFunctions(search ?? '', limit);
   }
 
+  /**
+   * Find all functions that call the given function.
+   *
+   * Looks up the function by qualified name (e.g. "MyClass::myMethod" or
+   * "MyClass.myMethod"), then returns every CALLS edge pointing to it.
+   *
+   * @param functionName - Qualified or simple function name
+   * @returns Array of caller relationships, empty if not found
+   */
+  async getCallers(functionName: string): Promise<CallRelation[]> {
+    if (this.isMock) {
+      return getMockCallRelations(functionName, 'callers');
+    }
+
+    await this.ensureConnected();
+    const fn = await this.findFunctionByName(functionName);
+    if (!fn) return [];
+    return this.queryEngine!.getCallers(fn.id);
+  }
+
+  /**
+   * Find all functions called by the given function.
+   *
+   * Looks up the function by qualified name, then returns every
+   * outgoing CALLS edge from it.
+   *
+   * @param functionName - Qualified or simple function name
+   * @returns Array of callee relationships, empty if not found
+   */
+  async getCallees(functionName: string): Promise<CallRelation[]> {
+    if (this.isMock) {
+      return getMockCallRelations(functionName, 'callees');
+    }
+
+    await this.ensureConnected();
+    const fn = await this.findFunctionByName(functionName);
+    if (!fn) return [];
+    return this.queryEngine!.getCallees(fn.id);
+  }
+
   // -----------------------------------------------------------------------
   // Discovery
   // -----------------------------------------------------------------------
@@ -784,6 +854,29 @@ export class CodeGraphClient {
     if (!this.connected) {
       await this.connect();
     }
+  }
+
+  /**
+   * Look up a function by qualified name, falling back to substring/suffix matching.
+   * Mirrors the logic used by the CLI `query callers` / `query callees` commands.
+   */
+  private async findFunctionByName(functionName: string): Promise<FunctionNode | null> {
+    // Try exact qualified name first
+    let fn = await this.queryEngine!.getFunctionByName(functionName);
+    if (fn) return fn;
+
+    // Try searching and matching by suffix (handles Class::method, Class.method, etc.)
+    const candidates = await this.queryEngine!.searchFunctions(
+      functionName.split(/[.:]+/).pop() ?? functionName,
+      50,
+    );
+    return candidates.find(
+      (f) =>
+        f.name === functionName ||
+        f.qualifiedName === functionName ||
+        f.qualifiedName.endsWith(`::${functionName}`) ||
+        f.qualifiedName.endsWith(`.${functionName}`),
+    ) ?? null;
   }
 }
 

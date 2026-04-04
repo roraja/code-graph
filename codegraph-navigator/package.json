@@ -106,9 +106,24 @@
         "enablement": "editorHasSelection || editorTextFocus"
       },
       {
+        "command": "codegraph.findCallers",
+        "title": "CodeGraph: Find Callers",
+        "enablement": "editorHasSelection || editorTextFocus"
+      },
+      {
+        "command": "codegraph.findCallees",
+        "title": "CodeGraph: Find Callees",
+        "enablement": "editorHasSelection || editorTextFocus"
+      },
+      {
         "command": "codegraph.searchFunctions",
         "title": "CodeGraph: Search Functions",
         "icon": "$(search)"
+      },
+      {
+        "command": "codegraph.traceScenario",
+        "title": "CodeGraph: Trace Scenario",
+        "icon": "$(debug-start)"
       }
     ],
     "menus": {
@@ -150,6 +165,10 @@
           "when": "view == codegraph.scenarios && viewItem == scenario"
         },
         {
+          "command": "codegraph.traceScenario",
+          "when": "view == codegraph.scenarios && viewItem == scenario"
+        },
+        {
           "command": "codegraph.openStepInEditor",
           "when": "view == codegraph.stepWalker && viewItem == step",
           "group": "inline"
@@ -172,6 +191,16 @@
         {
           "command": "codegraph.discoverFromSymbol",
           "group": "codegraph@2",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "codegraph.findCallers",
+          "group": "codegraph@3",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "codegraph.findCallees",
+          "group": "codegraph@4",
           "when": "editorTextFocus"
         }
       ]

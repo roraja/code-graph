@@ -26,7 +26,7 @@ export { CppParser, type CppParserConfig } from './parser/cpp.js';
 export { GraphDriver } from './graph/driver.js';
 export { GraphSchema } from './graph/schema.js';
 export { CodeIndexer } from './graph/indexer.js';
-export { QueryEngine } from './graph/queries.js';
+export { QueryEngine, type CallRelation } from './graph/queries.js';
 
 // --- AI Layer ---
 export { AIAgent, createAIProvider, type AIProvider, type AIConfig } from './ai/agent.js';
