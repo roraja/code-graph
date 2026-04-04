@@ -155,3 +155,11 @@ export async function fetchGraphData(scenarioId: string): Promise<GraphData> {
 export async function getStats(): Promise<DatabaseStats> {
   return request<DatabaseStats>('/stats');
 }
+
+/**
+ * Get public config (editor settings, project name).
+ * GET /api/config
+ */
+export async function fetchConfig(): Promise<{ projectName: string; editor: { sshHost?: string } }> {
+  return request<{ projectName: string; editor: { sshHost?: string } }>('/config');
+}

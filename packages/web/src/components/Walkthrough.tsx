@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useScenarioStore } from '../stores/scenario';
 import { JustificationPanel } from './JustificationPanel';
+import { OpenInVSCode } from './OpenInVSCode';
 import type { StepAction } from '../types';
 
 /** Icon mapping for step action types. */
@@ -359,6 +360,7 @@ export function Walkthrough(): React.JSX.Element {
                 Line {step.line}
               </span>
             )}
+            <OpenInVSCode filePath={step.functionId.split(':')[0] || ''} line={step.line} />
           </div>
           <div style={styles.codeContainer}>
             {codeLines.length > 0 ? (

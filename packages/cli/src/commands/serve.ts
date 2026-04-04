@@ -37,9 +37,8 @@ export function registerServeCommand(program: Command): void {
         console.log();
 
         // Dynamically import the server package
-        let startServer: (options: { port: number; host: string; config: typeof config }) => Promise<void>;
+        let startServer: (config: typeof config) => Promise<unknown>;
         try {
-          // @ts-expect-error — @codegraph/server may not be built yet
           const serverModule = await import('@codegraph/server');
           startServer = serverModule.startServer ?? serverModule.default;
         } catch {
@@ -52,7 +51,13 @@ export function registerServeCommand(program: Command): void {
           process.exit(1);
         }
 
-        await startServer({ port, host, config });
+        // Override server config with CLI options
+        const serverConfig = {
+          ...config,
+          server: { ...config.server, port, host },
+        };
+
+        await startServer(serverConfig);
 
         console.log();
         console.log(

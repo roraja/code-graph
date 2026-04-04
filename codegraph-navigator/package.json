@@ -1,0 +1,206 @@
+{
+  "name": "codegraph-navigator",
+  "displayName": "CodeGraph Navigator",
+  "description": "Explore CodeGraph scenarios, walk through traced execution paths, and inspect functions — all from the VS Code sidebar.",
+  "version": "0.1.0",
+  "publisher": "codegraph",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codegraph/code-graph"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:.codegraph.yaml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codegraph-navigator",
+          "title": "CodeGraph",
+          "icon": "media/codegraph-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codegraph-navigator": [
+        {
+          "id": "codegraph.scenarios",
+          "name": "Scenarios"
+        },
+        {
+          "id": "codegraph.stepWalker",
+          "name": "Step Walker"
+        },
+        {
+          "id": "codegraph.functions",
+          "name": "Functions"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codegraph.showViewer",
+        "title": "CodeGraph: Show Code Graph Viewer",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "codegraph.showOutput",
+        "title": "CodeGraph: Show Output Log"
+      },
+      {
+        "command": "codegraph.refreshScenarios",
+        "title": "CodeGraph: Refresh Scenarios",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codegraph.viewScenario",
+        "title": "CodeGraph: View Scenario"
+      },
+      {
+        "command": "codegraph.walkScenario",
+        "title": "CodeGraph: Walk Scenario"
+      },
+      {
+        "command": "codegraph.nextStep",
+        "title": "CodeGraph: Next Step",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "codegraph.prevStep",
+        "title": "CodeGraph: Previous Step",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "codegraph.openStepInEditor",
+        "title": "CodeGraph: Open Step in Editor"
+      },
+      {
+        "command": "codegraph.refreshFunctions",
+        "title": "CodeGraph: Refresh Functions",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codegraph.showScenariosForFunction",
+        "title": "CodeGraph: Show Scenarios for Function"
+      },
+      {
+        "command": "codegraph.discoverFromFunction",
+        "title": "CodeGraph: Discover Scenarios from Function"
+      },
+      {
+        "command": "codegraph.showScenariosForSymbol",
+        "title": "CodeGraph: Show Scenarios for This Function",
+        "enablement": "editorHasSelection || editorTextFocus"
+      },
+      {
+        "command": "codegraph.discoverFromSymbol",
+        "title": "CodeGraph: Discover Scenarios Starting from This Function",
+        "enablement": "editorHasSelection || editorTextFocus"
+      },
+      {
+        "command": "codegraph.searchFunctions",
+        "title": "CodeGraph: Search Functions",
+        "icon": "$(search)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "codegraph.refreshScenarios",
+          "when": "view == codegraph.scenarios",
+          "group": "navigation"
+        },
+        {
+          "command": "codegraph.nextStep",
+          "when": "view == codegraph.stepWalker",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codegraph.prevStep",
+          "when": "view == codegraph.stepWalker",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codegraph.refreshFunctions",
+          "when": "view == codegraph.functions",
+          "group": "navigation"
+        },
+        {
+          "command": "codegraph.searchFunctions",
+          "when": "view == codegraph.functions",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "codegraph.viewScenario",
+          "when": "view == codegraph.scenarios && viewItem == scenario",
+          "group": "inline"
+        },
+        {
+          "command": "codegraph.walkScenario",
+          "when": "view == codegraph.scenarios && viewItem == scenario"
+        },
+        {
+          "command": "codegraph.openStepInEditor",
+          "when": "view == codegraph.stepWalker && viewItem == step",
+          "group": "inline"
+        },
+        {
+          "command": "codegraph.showScenariosForFunction",
+          "when": "view == codegraph.functions && viewItem == function"
+        },
+        {
+          "command": "codegraph.discoverFromFunction",
+          "when": "view == codegraph.functions && viewItem == function"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "codegraph.showScenariosForSymbol",
+          "group": "codegraph@1",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "codegraph.discoverFromSymbol",
+          "group": "codegraph@2",
+          "when": "editorTextFocus"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeGraph Navigator",
+      "properties": {
+        "codegraph.cliPath": {
+          "type": "string",
+          "default": "codegraph",
+          "description": "Path to the codegraph CLI binary. Defaults to 'codegraph' (found via PATH)."
+        },
+        "codegraph.autoOpenStep": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open the source file when stepping through a scenario."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -watch -p tsconfig.json",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

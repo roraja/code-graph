@@ -41,8 +41,6 @@ import {
 function buildAIProvider(config: CodeGraphConfig): AIProvider {
   const aiCfg = config.ai;
   if (aiCfg.provider === 'openai') {
-    // Lazy-require so we don't fail when openai is not installed
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { OpenAIProvider } = require('@codegraph/core/dist/ai/agent.js') as {
       OpenAIProvider: new (cfg: AIConfig) => AIProvider;
     };
@@ -53,6 +51,12 @@ function buildAIProvider(config: CodeGraphConfig): AIProvider {
       maxTokens: aiCfg.maxTokensPerRequest,
       temperature: aiCfg.temperature,
     });
+  }
+  if (aiCfg.provider === 'copilot') {
+    const { CopilotCLIProvider } = require('@codegraph/core/dist/ai/copilot-cli-provider.js') as {
+      CopilotCLIProvider: new () => AIProvider;
+    };
+    return new CopilotCLIProvider();
   }
   // Default to mock provider
   const { MockAIProvider } = require('@codegraph/core/dist/ai/agent.js') as {
@@ -121,9 +125,14 @@ export async function createServerContext(
   const queryEngine = new QueryEngine(driver);
 
   // --- Parser ---
-  const parser: ICodeParser = new TypeScriptParser(
-    config.parser.typescript?.tsconfig ?? 'tsconfig.json',
-  );
+  const lang = config.project.languages[0] ?? 'ts';
+  let parser: ICodeParser;
+  if (lang === 'cpp' || lang === 'cc' || lang === 'cxx') {
+    const { CppParser } = await import('@codegraph/core');
+    parser = new CppParser(config.parser.cpp);
+  } else {
+    parser = new TypeScriptParser();
+  }
 
   // --- AI layer ---
   const aiProvider: AIProvider = buildAIProvider(config);

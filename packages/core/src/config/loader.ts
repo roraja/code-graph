@@ -55,6 +55,12 @@ const ServerConfigSchema = z.object({
   host: z.string().default('127.0.0.1'),
 });
 
+/** Editor integration configuration */
+const EditorConfigSchema = z.object({
+  /** SSH hostname for VS Code Remote SSH links (e.g. "edge_bugs5") */
+  sshHost: z.string().optional(),
+}).default({});
+
 /** Full CodeGraph configuration schema */
 const CodeGraphConfigSchema = z.object({
   project: z.object({
@@ -71,6 +77,7 @@ const CodeGraphConfigSchema = z.object({
   ai: AIConfigSchema.default({}),
   tracing: TracingConfigSchema.default({}),
   server: ServerConfigSchema.default({}),
+  editor: EditorConfigSchema,
 });
 
 /** Validated CodeGraph configuration type */

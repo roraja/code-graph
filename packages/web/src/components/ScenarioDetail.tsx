@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { CallGraph } from './CallGraph';
 import { Walkthrough } from './Walkthrough';
 import { CorrectionChat } from './CorrectionChat';
+import { OpenInVSCode } from './OpenInVSCode';
 import { useScenarioStore } from '../stores/scenario';
 import type { GraphNode } from '../types';
 
@@ -162,6 +163,7 @@ export function ScenarioDetail(): React.JSX.Element {
                     <div>{selectedNode.filePath}
                       {selectedNode.line ? `:${selectedNode.line}` : ''}
                     </div>
+                    <OpenInVSCode filePath={selectedNode.filePath} line={selectedNode.line} />
                     {selectedNode.signature && (
                       <div style={{ marginTop: 4, color: '#81d4fa', fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
                         {selectedNode.signature}

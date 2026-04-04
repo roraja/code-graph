@@ -35,6 +35,17 @@ export function createRestRouter(ctx: ServerContext): Router {
     });
   });
 
+  /**
+   * GET /api/config — public configuration (editor settings, project name).
+   * Only exposes non-sensitive fields needed by the web UI.
+   */
+  router.get('/api/config', (_req: Request, res: Response) => {
+    res.json({
+      projectName: ctx.config.project.name,
+      editor: ctx.config.editor ?? {},
+    });
+  });
+
   // ------------------------------------------------------------------
   // Stats
   // ------------------------------------------------------------------
@@ -139,7 +150,7 @@ export function createRestRouter(ctx: ServerContext): Router {
       const from = req.query.from ? Number(req.query.from) : undefined;
       const to = req.query.to ? Number(req.query.to) : undefined;
       const steps = await ctx.scenarioEngine.getSteps(req.params.id, from, to);
-      res.json(steps);
+      res.json({ steps, totalSteps: steps.length });
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
     }
@@ -289,6 +300,81 @@ export function createRestRouter(ctx: ServerContext): Router {
     try {
       const callees = await ctx.queryEngine.getCallees(req.params.id);
       res.json(callees);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // Graph (for visualization)
+  // ------------------------------------------------------------------
+
+  /**
+   * GET /api/graph/:scenarioId — get graph nodes and edges for a scenario.
+   * Returns functions as nodes and calls as edges for Cytoscape visualization.
+   */
+  router.get('/api/graph/:scenarioId', async (req: Request, res: Response) => {
+    try {
+      const scenario = await ctx.scenarioEngine.getScenario(req.params.scenarioId);
+      if (!scenario) {
+        res.status(404).json({ error: 'Scenario not found' });
+        return;
+      }
+
+      const steps = await ctx.scenarioEngine.getSteps(req.params.scenarioId);
+
+      // Build nodes from scenario steps (unique functions)
+      const nodeMap = new Map<string, {
+        id: string; label: string; type: string;
+        filePath: string; line: number;
+        sourceCode?: string; qualifiedName?: string; signature?: string;
+      }>();
+      const edges: Array<{
+        id: string; source: string; target: string;
+        label: string; isVirtualDispatch: boolean;
+      }> = [];
+
+      for (const step of steps) {
+        const nodeId = step.functionId || `step-${step.stepNumber}`;
+        if (!nodeMap.has(nodeId)) {
+          // Extract file path from functionId (format: "filepath:line")
+          const parts = (step.functionId ?? '').split(':');
+          const filePath = parts.length > 1 ? parts.slice(0, -1).join(':') : step.functionId ?? '';
+
+          const actionType = step.action.includes('branch') ? 'branch' : 'function';
+
+          nodeMap.set(nodeId, {
+            id: nodeId,
+            label: step.functionName,
+            type: actionType,
+            filePath,
+            line: step.line ?? step.stepNumber,
+            sourceCode: step.sourceCode ?? undefined,
+            qualifiedName: step.functionName,
+          });
+        }
+      }
+
+      // Build edges from sequential steps
+      for (let i = 0; i < steps.length - 1; i++) {
+        const current = steps[i];
+        const next = steps[i + 1];
+        if (!current || !next) continue;
+        const sourceId = current.functionId || `step-${current.stepNumber}`;
+        const targetId = next.functionId || `step-${next.stepNumber}`;
+        edges.push({
+          id: `edge-${i}`,
+          source: sourceId,
+          target: targetId,
+          label: next.action,
+          isVirtualDispatch: next.action === 'dispatch',
+        });
+      }
+
+      res.json({
+        nodes: Array.from(nodeMap.values()),
+        edges,
+      });
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
     }

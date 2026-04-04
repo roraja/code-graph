@@ -61,6 +61,14 @@ export async function startServer(config: CodeGraphConfig) {
   const webUiDist = resolve(__dirname, '../../web/dist');
   if (existsSync(webUiDist)) {
     app.use(express.static(webUiDist));
+    // SPA fallback: serve index.html for any non-API, non-GraphQL route
+    app.get('*', (req, res) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/graphql')) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      res.sendFile(resolve(webUiDist, 'index.html'));
+    });
     logger.info('Serving web UI from %s', webUiDist);
   }
 
