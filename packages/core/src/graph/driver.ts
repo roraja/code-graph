@@ -167,6 +167,25 @@ export class GraphDriver {
   }
 
   /**
+   * Coerces JavaScript numbers that are safe integers into Neo4j Integer
+   * values. Neo4j's Cypher engine requires integer types for clauses like
+   * LIMIT and SKIP — plain JS numbers are sent as floats by the driver.
+   */
+  private coerceParams(
+    params: Record<string, unknown>
+  ): Record<string, unknown> {
+    const coerced: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === 'number' && Number.isInteger(value)) {
+        coerced[key] = neo4j.int(value);
+      } else {
+        coerced[key] = value;
+      }
+    }
+    return coerced;
+  }
+
+  /**
    * Executes a single Cypher query and returns the result records.
    *
    * @param cypher - The Cypher query string
@@ -187,7 +206,7 @@ export class GraphDriver {
   ): Promise<QueryResult> {
     const session = this.getSession();
     try {
-      return await session.run(cypher, params);
+      return await session.run(cypher, this.coerceParams(params));
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error);

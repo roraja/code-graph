@@ -1,13 +1,13 @@
 /**
  * CodeGraph Navigator — VS Code Extension entry point.
  *
- * A lightweight sidebar extension that shells out to the globally installed
- * `codegraph` CLI to explore scenarios, walk through execution traces
- * step-by-step, and browse functions in the code graph.
+ * Uses @codegraph/core directly as a JS API (no CLI shelling out).
+ * The core-bridge module wraps the CodeGraphClient from @codegraph/core,
+ * handling connection probing, mock fallback, and error handling.
  *
  * Architecture:
- *   - The CLI is the primary interface; this extension is a thin UI layer.
- *   - All data comes from `codegraph <command> --format json` via cli-bridge.
+ *   - @codegraph/core is a direct npm dependency (monorepo workspace).
+ *   - All data comes from the core-bridge which calls CodeGraphClient.
  *   - Three sidebar views: Scenarios, Step Walker, Functions.
  *   - Editor context menu: right-click a function name to find scenarios
  *     or discover new scenarios starting from it.
@@ -18,12 +18,12 @@
 
 import * as vscode from 'vscode';
 import { initLogger, log, disposeLogger, showOutputChannel } from './logger.js';
-import * as cliBridge from './cli-bridge.js';
+import * as coreBridge from './core-bridge.js';
 import { ScenariosProvider } from './providers/scenarios.js';
 import { StepWalkerProvider } from './providers/step-walker.js';
 import { FunctionsProvider } from './providers/functions.js';
 import { openStepInEditor } from './decorations.js';
-import type { ScenarioStep } from './types.js';
+import type { ScenarioStep } from '@codegraph/core';
 
 export function activate(context: vscode.ExtensionContext): void {
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -35,15 +35,15 @@ export function activate(context: vscode.ExtensionContext): void {
 
   log('info', 'CodeGraph Navigator activating', {
     workspaceRoot,
-    extensionVersion: '0.1.0',
+    extensionVersion: '0.2.0',
   });
 
-  // Check CLI availability
-  cliBridge.checkCLI().then((ok) => {
+  // Check core availability (always true since it's a direct dependency)
+  coreBridge.checkAvailability().then((ok) => {
     if (!ok) {
       vscode.window.showWarningMessage(
-        'CodeGraph Navigator: `codegraph` CLI not found in PATH. ' +
-        'Install it globally or set codegraph.cliPath in settings.'
+        'CodeGraph Navigator: @codegraph/core failed to load. ' +
+        'Ensure the monorepo is built (npm run build).'
       );
     }
   });
@@ -169,7 +169,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `Finding scenarios for ${functionName}...` },
         async () => {
-          const scenarios = await cliBridge.getScenariosForFunction(functionName);
+          const scenarios = await coreBridge.getScenariosForFunction(functionName);
           if (scenarios.length === 0) {
             vscode.window.showInformationMessage(
               `No scenarios found involving ${functionName}. Try discovering new scenarios.`
@@ -202,7 +202,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `Discovering scenarios from ${functionName}...`, cancellable: false },
         async () => {
-          await cliBridge.discoverFromFunction(functionName);
+          await coreBridge.discoverFromFunction(functionName);
           scenariosProvider.refresh();
         }
       );
@@ -222,7 +222,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `Finding scenarios for "${functionName}"...` },
         async () => {
-          const scenarios = await cliBridge.getScenariosForFunction(functionName);
+          const scenarios = await coreBridge.getScenariosForFunction(functionName);
           if (scenarios.length === 0) {
             vscode.window.showInformationMessage(
               `No scenarios found involving "${functionName}".`
@@ -259,18 +259,26 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `Discovering scenarios from "${functionName}"...`, cancellable: false },
         async () => {
-          await cliBridge.discoverFromFunction(functionName);
+          await coreBridge.discoverFromFunction(functionName);
           scenariosProvider.refresh();
         }
       );
     })
   );
 
+  // Clean up on deactivation
+  context.subscriptions.push({
+    dispose: () => {
+      coreBridge.dispose();
+    },
+  });
+
   log('info', 'CodeGraph Navigator activated');
 }
 
 export function deactivate(): void {
   log('info', 'CodeGraph Navigator deactivated');
+  coreBridge.dispose();
   disposeLogger();
 }
 

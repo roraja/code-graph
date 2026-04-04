@@ -49,7 +49,18 @@ Load: `.context/domains/web.md`
 3. Update Zustand stores if new state is needed
 4. Add routes if new pages are needed
 
-### Step 6: Test
+### Step 6: VS Code Extension (if needed)
+
+Load: `.context/domains/vscode-extension.md`
+
+If the feature adds new CLI commands with `--format json` output, consider exposing them in the VS Code extension:
+
+1. Add new CLI bridge functions in `codegraph-navigator/src/cli-bridge.ts`
+2. Add tree data providers or commands in `codegraph-navigator/src/`
+3. Register new commands in `codegraph-navigator/src/extension.ts` and `package.json`
+4. Build and install: `cd codegraph-navigator && npm run build && npx @vscode/vsce package --no-dependencies && code --install-extension codegraph-navigator-0.1.0.vsix`
+
+### Step 7: Test
 
 Load: `.context/domains/testing.md`
 
@@ -57,7 +68,7 @@ Load: `.context/domains/testing.md`
 2. Run integration tests if graph-related: `npm run test:integration`
 3. Run lint: `npm run lint`
 
-### Step 7: Document
+### Step 8: Document
 
 1. Create feature doc: `docs/features/NN-feature-name.md`
 2. Log execution: `docs/copilot-executions/NN-slug.md`

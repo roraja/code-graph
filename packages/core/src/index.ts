@@ -54,3 +54,12 @@ export { loadConfig, findProjectRoot, getCodeGraphDir, type CodeGraphConfig } fr
 
 // --- Logger ---
 export { logger } from './config/logger.js';
+
+// --- Public API (high-level facade) ---
+export {
+  createCodeGraphClient,
+  CodeGraphClient,
+  type CodeGraphClientOptions,
+  type ScenarioView,
+  type FunctionInfo,
+} from './api.js';

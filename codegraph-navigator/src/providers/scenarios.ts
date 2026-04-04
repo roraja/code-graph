@@ -2,15 +2,15 @@
  * Scenarios Tree Provider — populates the "Scenarios" sidebar view.
  *
  * Shows a tree of all scenarios. Each scenario node can be expanded
- * to show its steps (lazy-loaded via CLI when expanded).
+ * to show its steps (lazy-loaded via @codegraph/core when expanded).
  *
  * @module providers/scenarios
  */
 
 import * as vscode from 'vscode';
-import * as cliBridge from '../cli-bridge.js';
+import * as coreBridge from '../core-bridge.js';
 import { log } from '../logger.js';
-import type { Scenario, ScenarioStep, ScenarioView } from '../types.js';
+import type { Scenario, ScenarioStep, ScenarioView } from '@codegraph/core';
 
 /** A node in the scenarios tree — either a scenario or a step */
 type ScenarioTreeNode = ScenarioNode | StepPreviewNode;
@@ -130,7 +130,7 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
     if (!element) {
       // Root level — list all scenarios
       try {
-        const scenarios = await cliBridge.listScenarios();
+        const scenarios = await coreBridge.listScenarios();
         return scenarios.map((s) => new ScenarioNode(s));
       } catch (err) {
         log('error', 'Failed to load scenarios for tree', {
@@ -146,7 +146,7 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
       try {
         let view = this.viewCache.get(scenarioId);
         if (!view) {
-          view = await cliBridge.getScenarioView(scenarioId) ?? undefined;
+          view = await coreBridge.getScenarioView(scenarioId) ?? undefined;
           if (view) {
             this.viewCache.set(scenarioId, view);
           }
@@ -171,7 +171,7 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
   async getScenarioView(scenarioId: string): Promise<ScenarioView | undefined> {
     let view = this.viewCache.get(scenarioId);
     if (!view) {
-      const loaded = await cliBridge.getScenarioView(scenarioId);
+      const loaded = await coreBridge.getScenarioView(scenarioId);
       if (loaded) {
         this.viewCache.set(scenarioId, loaded);
         view = loaded;

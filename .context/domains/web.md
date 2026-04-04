@@ -23,6 +23,7 @@ React + Vite single-page application with graph visualization. Located in `packa
 | `src/types.ts` | Shared TypeScript types (`Scenario`, `ScenarioStep`, `FunctionNode`, `CallEdge`, `BranchNode`, `Correction`, `CorrectionResult`, `GraphData`, `GraphNode`, `GraphEdge`, `DatabaseStats`, etc.) |
 | `src/stores/scenario.ts` | `useScenarioStore` — Zustand store for scenarios, steps, variable state, corrections |
 | `src/stores/graph.ts` | `useGraphStore` — Zustand store for graph visualization nodes, edges, layout, filtering |
+| `src/stores/config.ts` | `useConfigStore` — Zustand store for editor config (e.g., `sshHost` for VS Code Remote SSH links). Fetches from `/api/config` |
 | **Components** | |
 | `src/components/ScenarioList.tsx` | Browse discovered scenarios |
 | `src/components/ScenarioDetail.tsx` | View scenario with steps |
@@ -31,6 +32,7 @@ React + Vite single-page application with graph visualization. Located in `packa
 | `src/components/CorrectionChat.tsx` | Submit corrections in natural language |
 | `src/components/Header.tsx` | Application header/navigation |
 | `src/components/JustificationPanel.tsx` | Display step justifications and assumptions |
+| `src/components/OpenInVSCode.tsx` | "Open in VS Code" button — generates `vscode://` or `vscode-remote://` URIs using `sshHost` from config store for remote SSH workspaces |
 
 ## API Client
 

@@ -3,6 +3,14 @@
 src/**
 node_modules/**
 tsconfig.json
+esbuild.mjs
 **/*.map
 **/*.ts
-!dist/**
+dist/core-bridge.js
+dist/core-bridge.d.ts
+dist/decorations.js
+dist/decorations.d.ts
+dist/logger.js
+dist/logger.d.ts
+dist/providers/**
+!dist/extension.js

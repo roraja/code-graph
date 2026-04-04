@@ -10,7 +10,7 @@
 
 import * as vscode from 'vscode';
 import { log } from '../logger.js';
-import type { ScenarioStep, ScenarioView } from '../types.js';
+import type { ScenarioStep, ScenarioView } from '@codegraph/core';
 
 /** Node types in the step walker tree */
 type WalkerNode = StepHeaderNode | PropertyNode | VariableNode;

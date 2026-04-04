@@ -2,7 +2,7 @@
   "name": "codegraph-navigator",
   "displayName": "CodeGraph Navigator",
   "description": "Explore CodeGraph scenarios, walk through traced execution paths, and inspect functions — all from the VS Code sidebar.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "codegraph",
   "repository": {
     "type": "git",
@@ -179,11 +179,6 @@
     "configuration": {
       "title": "CodeGraph Navigator",
       "properties": {
-        "codegraph.cliPath": {
-          "type": "string",
-          "default": "codegraph",
-          "description": "Path to the codegraph CLI binary. Defaults to 'codegraph' (found via PATH)."
-        },
         "codegraph.autoOpenStep": {
           "type": "boolean",
           "default": true,
@@ -193,14 +188,20 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run build",
-    "build": "tsc -p tsconfig.json",
-    "watch": "tsc -watch -p tsconfig.json",
+    "vscode:prepublish": "npm run compile && npm run bundle",
+    "compile": "tsc -p tsconfig.json",
+    "bundle": "node esbuild.mjs",
+    "build": "npm run compile && npm run bundle",
+    "watch": "node esbuild.mjs --watch",
     "lint": "eslint src --ext ts"
   },
+  "dependencies": {
+    "@codegraph/core": "0.1.0"
+  },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.28.0",
     "typescript": "^5.3.3"
   }
 }

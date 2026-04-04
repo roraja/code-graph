@@ -11,7 +11,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { log } from './logger.js';
-import type { ScenarioStep } from './types.js';
+import type { ScenarioStep } from '@codegraph/core';
 
 /** Decoration type for the current step line */
 const stepDecorationType = vscode.window.createTextEditorDecorationType({

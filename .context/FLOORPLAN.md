@@ -1,8 +1,8 @@
 # CodeGraph Workspace Floorplan
 
-**CodeGraph** parses codebases into a Neo4j graph, then uses AI agents to discover usage scenarios, trace execution paths, and support human corrections — surfaced via CLI, GraphQL/REST API, and React web UI.
+**CodeGraph** parses codebases into a Neo4j graph, then uses AI agents to discover usage scenarios, trace execution paths, and support human corrections — surfaced via CLI, GraphQL/REST API, React web UI, and VS Code extension.
 
-Four npm workspace packages: **core** (engines), **cli** (Commander.js), **server** (Express + Apollo), **web** (React + Vite).
+Five components: **core** (engines), **cli** (Commander.js), **server** (Express + Apollo), **web** (React + Vite), **codegraph-navigator** (VS Code extension).
 
 ## How to Navigate
 
@@ -23,6 +23,7 @@ Four npm workspace packages: **core** (engines), **cli** (Commander.js), **serve
 | CLI commands, interactive REPL, prompts | `domains/cli.md` | `packages/cli/src/commands/` |
 | GraphQL schema, resolvers, REST routes | `domains/server.md` | `packages/server/src/` |
 | React UI, Cytoscape graphs, Zustand stores | `domains/web.md` | `packages/web/src/` |
+| VS Code extension, sidebar views, step walker | `domains/vscode-extension.md` | `codegraph-navigator/src/` |
 | Tests (unit, integration, E2E, fixtures) | `domains/testing.md` | `packages/core/src/**/*.test.ts`, `test/` |
 
 ## Process Routing Table
@@ -37,16 +38,29 @@ Four npm workspace packages: **core** (engines), **cli** (Commander.js), **serve
 ## Package Dependency Flow
 
 ```
-@codegraph/core  ← foundation (no deps on other packages)
-    ↑
-@codegraph/cli   ← depends on core
-@codegraph/server ← depends on core
-@codegraph/web   ← standalone (connects to server via REST API at runtime)
+@codegraph/core   <- foundation (no deps on other packages)
+    ^
+@codegraph/cli    <- depends on core
+@codegraph/server <- depends on core
+@codegraph/web    <- standalone SPA (connects to server via REST API at runtime)
+
+codegraph-navigator <- standalone VS Code extension (shells out to `codegraph` CLI, no code dependency on any package)
 ```
 
 ## Configuration Location
 
 Config lives at `.vscode/code-graph/codegraph.yaml` (primary) with fallback to legacy `.codegraph.yaml`. The `findProjectRoot()` function walks up the directory tree checking both locations.
+
+## VS Code Integration
+
+The workspace has VS Code-specific files in `.vscode/`:
+
+| File | Purpose |
+|------|---------|
+| `.vscode/settings.json` | Neo4j connection settings, CodeGraph extension settings (`codegraph.cliPath`, `codegraph.autoOpenStep`) |
+| `.vscode/tasks.json` | Build/install tasks for the VS Code extension (install deps, build, package VSIX, install VSIX, watch mode) |
+| `.vscode/launch.json` | Debug launch config for running the extension in an Extension Development Host |
+| `.vscode/code-graph/logs/` | Datewise log files from the VS Code extension (`YYYY-MM-DD.log`) |
 
 ## File Naming Conventions
 
@@ -81,3 +95,5 @@ These apply everywhere in the codebase:
 | Config not found | `findProjectRoot()` looks for `.vscode/code-graph/codegraph.yaml` then `.codegraph.yaml` |
 | Web UI shows blank page | Build web: `cd packages/web && npm run build`, then `codegraph serve` |
 | Lint errors on test files | Tests are `.ts` not `.tsx` — check `--ext` flag matches |
+| VS Code extension shows empty views | Open Output panel → "CodeGraph Navigator" to see CLI bridge errors. Check `codegraph` is in PATH and Neo4j is running |
+| VS Code extension build fails | Run from extension dir: `cd codegraph-navigator && npm run build` (not the root `npm run build`) |

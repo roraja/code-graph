@@ -11,18 +11,18 @@
 
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import * as cliBridge from '../cli-bridge.js';
+import * as coreBridge from '../core-bridge.js';
 import { log } from '../logger.js';
-import type { FunctionInfo } from '../types.js';
+import type { FunctionNode } from '@codegraph/core';
 
 /** A node in the functions tree — either a file group or a function */
-type FunctionTreeNode = FileGroupNode | FunctionNode;
+type FunctionTreeNode = FileGroupNode | FunctionNodeItem;
 
 /** A file grouping node */
 class FileGroupNode extends vscode.TreeItem {
   constructor(
     public readonly filePath: string,
-    public readonly functions: FunctionInfo[]
+    public readonly functions: FunctionNode[]
   ) {
     super(path.basename(filePath), vscode.TreeItemCollapsibleState.Collapsed);
     this.description = `${functions.length} function(s)`;
@@ -33,8 +33,8 @@ class FileGroupNode extends vscode.TreeItem {
 }
 
 /** A function node */
-class FunctionNode extends vscode.TreeItem {
-  constructor(public readonly func: FunctionInfo) {
+class FunctionNodeItem extends vscode.TreeItem {
+  constructor(public readonly func: FunctionNode) {
     super(func.qualifiedName, vscode.TreeItemCollapsibleState.None);
 
     const paramStr = func.parameters
@@ -82,7 +82,7 @@ export class FunctionsProvider implements vscode.TreeDataProvider<FunctionTreeNo
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private searchQuery: string | undefined;
-  private cachedFunctions: FunctionInfo[] = [];
+  private cachedFunctions: FunctionNode[] = [];
 
   refresh(): void {
     this.cachedFunctions = [];
@@ -100,7 +100,7 @@ export class FunctionsProvider implements vscode.TreeDataProvider<FunctionTreeNo
   /**
    * Get all cached functions (for lookup by name).
    */
-  getCachedFunctions(): FunctionInfo[] {
+  getCachedFunctions(): FunctionNode[] {
     return this.cachedFunctions;
   }
 
@@ -110,7 +110,7 @@ export class FunctionsProvider implements vscode.TreeDataProvider<FunctionTreeNo
 
   async getChildren(element?: FunctionTreeNode): Promise<FunctionTreeNode[]> {
     if (element instanceof FileGroupNode) {
-      return element.functions.map((f) => new FunctionNode(f));
+      return element.functions.map((f) => new FunctionNodeItem(f));
     }
 
     if (element) {
@@ -120,10 +120,10 @@ export class FunctionsProvider implements vscode.TreeDataProvider<FunctionTreeNo
     // Root — load functions and group by file
     try {
       if (this.cachedFunctions.length === 0) {
-        this.cachedFunctions = await cliBridge.listFunctions(this.searchQuery);
+        this.cachedFunctions = await coreBridge.listFunctions(this.searchQuery);
       }
 
-      const byFile = new Map<string, FunctionInfo[]>();
+      const byFile = new Map<string, FunctionNode[]>();
       for (const fn of this.cachedFunctions) {
         const existing = byFile.get(fn.filePath) ?? [];
         existing.push(fn);

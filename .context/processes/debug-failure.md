@@ -32,6 +32,7 @@ CODEGRAPH_LOG_LEVEL=debug codegraph <command> -v
 | REST endpoint errors | `packages/server/src/rest/` |
 | React component errors | `packages/web/src/components/` |
 | Config/validation errors | `packages/core/src/config/` |
+| VS Code extension errors | `codegraph-navigator/src/` — check Output panel → "CodeGraph Navigator" |
 
 ### Step 3: Investigate
 

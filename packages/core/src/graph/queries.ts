@@ -294,7 +294,7 @@ export class QueryEngine {
        WHERE f.name CONTAINS $query OR f.qualifiedName CONTAINS $query
        RETURN f
        LIMIT $limit`,
-      { query, limit }
+      { query, limit: Math.trunc(limit) }
     );
 
     return result.records.map((record) =>
