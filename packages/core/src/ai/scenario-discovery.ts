@@ -144,6 +144,23 @@ export interface ScenarioDiscoveryInput {
   inheritances?: InheritanceSummary[];
   /** High-level codebase summary for orientation. */
   codebaseSummary?: CodebaseSummary;
+  /**
+   * A specific function to discover scenarios *involving* (not necessarily
+   * starting from). When set, the agent finds scenarios where this function
+   * appears anywhere in the execution path — as the entry, a callee, or
+   * a deeply-nested helper.
+   */
+  targetFunction?: FunctionSummary;
+  /**
+   * Functions that call the target function. Provides the AI with upstream
+   * context so it can construct scenarios that reach the target naturally.
+   */
+  targetCallers?: FunctionSummary[];
+  /**
+   * Functions called by the target function. Provides the AI with downstream
+   * context so it understands what the target function does.
+   */
+  targetCallees?: FunctionSummary[];
 }
 
 /**
@@ -289,10 +306,29 @@ export class ScenarioDiscoveryAgent extends AIAgent {
    * scenario discovery with rich structural context.
    */
   private buildSystemPrompt(input: ScenarioDiscoveryInput): string {
+    const hasTarget = !!input.targetFunction;
+    const targetName = input.targetFunction?.qualifiedName ?? input.targetFunction?.name ?? '';
+
     const lines: string[] = [
       'You are an expert software analyst specialising in behavioural analysis of codebases.',
-      'Your task is to discover realistic, high-value scenarios — concrete user-facing or system-facing',
-      'interactions that exercise meaningful execution paths through the code.',
+    ];
+
+    if (hasTarget) {
+      lines.push(
+        `Your task is to discover realistic scenarios in which the function "${targetName}" is called.`,
+        'The function does NOT have to be the entry point — find scenarios where it appears ANYWHERE',
+        'in the execution path (as an entry point, a direct callee, or a deeply-nested helper).',
+        'Each scenario should start from a top-level entry point and follow a path that eventually',
+        `reaches "${targetName}".`,
+      );
+    } else {
+      lines.push(
+        'Your task is to discover realistic, high-value scenarios — concrete user-facing or system-facing',
+        'interactions that exercise meaningful execution paths through the code.',
+      );
+    }
+
+    lines.push(
       '',
       '## What makes a GOOD scenario',
       '- It represents a real-world interaction a human user, API consumer, or external system would trigger.',
@@ -300,6 +336,17 @@ export class ScenarioDiscoveryAgent extends AIAgent {
       '- It exercises important decision points (branches, dispatch) in the code.',
       '- It has a clear trigger condition and expected outcome.',
       '- It covers both happy paths AND important error / edge-case paths.',
+    );
+
+    if (hasTarget) {
+      lines.push(
+        `- The execution path MUST include "${targetName}" — every proposed scenario must call it.`,
+        '- The entry point should be an upstream caller (direct or transitive) of the target function.',
+        '- Describe HOW and WHY the target function gets invoked in the scenario description.',
+      );
+    }
+
+    lines.push(
       '',
       '## What makes a BAD scenario (avoid these)',
       '- Trivial getters/setters or utility functions with no meaningful logic.',
@@ -307,20 +354,56 @@ export class ScenarioDiscoveryAgent extends AIAgent {
       '- Scenarios that only touch one function with no branches or calls.',
       '- Scenarios with vague descriptions like "user does something".',
       '- Internal implementation details that no external actor would trigger directly.',
+    );
+
+    if (hasTarget) {
+      lines.push(
+        `- Scenarios that do NOT actually call "${targetName}" — every scenario MUST involve it.`,
+      );
+    }
+
+    lines.push(
       '',
       '## Diversity requirements',
       '- Include a mix of happy-path, error-handling, and edge-case scenarios.',
       '- Cover different functional areas / modules of the codebase.',
       '- If async functions exist, include at least one scenario that exercises async flows.',
       '- If class hierarchies with virtual dispatch exist, include a scenario that exercises polymorphism.',
+    );
+
+    if (hasTarget) {
+      lines.push(
+        '- Show different reasons WHY the target function would be called (different callers, different conditions).',
+        '- If the target function has branches, show scenarios that exercise different branches within it.',
+      );
+    }
+
+    lines.push(
       '',
       '## Analysis strategy',
-      '1. Study the entry points to understand what external actors can trigger.',
-      '2. Follow the call graph to see which functions are reachable and what paths are possible.',
-      '3. Look at branch conditions to identify interesting decision points that lead to different outcomes.',
-      '4. Consider error conditions: what happens when validation fails, data is missing, or exceptions occur?',
-      '5. Check class hierarchies for polymorphic dispatch opportunities.',
-      '6. Read function documentation and parameter types to understand domain semantics.',
+    );
+
+    if (hasTarget) {
+      lines.push(
+        `1. Study the TARGET FUNCTION ("${targetName}") to understand what it does.`,
+        '2. Look at the CALLERS of the target function — these tell you who invokes it and under what conditions.',
+        '3. Trace UPWARD from callers to find top-level entry points that eventually reach the target.',
+        '4. For each entry point → target path, determine the trigger condition and branch decisions.',
+        '5. Consider different calling contexts: what arguments are passed? What state variations exist?',
+        '6. Also look at the CALLEES of the target — what downstream effects does it have?',
+      );
+    } else {
+      lines.push(
+        '1. Study the entry points to understand what external actors can trigger.',
+        '2. Follow the call graph to see which functions are reachable and what paths are possible.',
+        '3. Look at branch conditions to identify interesting decision points that lead to different outcomes.',
+        '4. Consider error conditions: what happens when validation fails, data is missing, or exceptions occur?',
+        '5. Check class hierarchies for polymorphic dispatch opportunities.',
+        '6. Read function documentation and parameter types to understand domain semantics.',
+      );
+    }
+
+    lines.push(
       '',
       '## Output format',
       'Return a JSON array of scenario objects. Each object MUST have these fields:',
@@ -331,6 +414,15 @@ export class ScenarioDiscoveryAgent extends AIAgent {
       '                    (b) WHAT they do and WHY',
       '                    (c) WHAT the expected outcome is (success or specific failure)',
       '                    (d) WHAT key decision points are exercised',
+    );
+
+    if (hasTarget) {
+      lines.push(
+        `                    (e) HOW the path reaches "${targetName}" and what role it plays`,
+      );
+    }
+
+    lines.push(
       '  entryFunction  — MUST be an exact qualifiedName from the function list below',
       '                    (e.g. "DropHandler::handleFileDrop" or "AuthService.authenticateUser")',
       '  triggerCondition — the specific event, HTTP request, user action, or system event that starts it',
@@ -338,11 +430,20 @@ export class ScenarioDiscoveryAgent extends AIAgent {
       '',
       'Optional fields (include when you can infer them from the call graph):',
       '  expectedPath   — ordered array of qualifiedName strings showing the expected call sequence',
+    );
+
+    if (hasTarget) {
+      lines.push(
+        `                    (MUST include "${targetName}" somewhere in the path)`,
+      );
+    }
+
+    lines.push(
       '  category       — grouping tag (e.g. "authentication", "file-handling", "error-recovery")',
       '  pathType       — "happy", "error", or "edge-case"',
       '',
       'Respond ONLY with a JSON array. No markdown fences, no commentary, no extra text.',
-    ];
+    );
 
     return lines.join('\n');
   }
@@ -354,6 +455,15 @@ export class ScenarioDiscoveryAgent extends AIAgent {
     // ---- Codebase summary (orientation) ----
     if (input.codebaseSummary) {
       sections.push(this.formatCodebaseSummary(input.codebaseSummary));
+    }
+
+    // ---- Target function (discover scenarios *involving* this function) ----
+    if (input.targetFunction) {
+      sections.push(this.formatTargetFunction(
+        input.targetFunction,
+        input.targetCallers ?? [],
+        input.targetCallees ?? [],
+      ));
     }
 
     // ---- Entry points ----
@@ -468,6 +578,46 @@ export class ScenarioDiscoveryAgent extends AIAgent {
       for (const mod of summary.moduleGroups) {
         lines.push(`  - ${mod}`);
       }
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Format the target function section with caller/callee context.
+   * This tells the AI which specific function to find scenarios involving.
+   */
+  private formatTargetFunction(
+    target: FunctionSummary,
+    callers: FunctionSummary[],
+    callees: FunctionSummary[],
+  ): string {
+    const displayName = target.qualifiedName ?? target.name;
+    const lines: string[] = [
+      '## Target Function (find scenarios that INVOLVE this function)',
+      `You MUST discover scenarios in which \`${displayName}\` is called.`,
+      `The function does NOT need to be the entry point — it can appear anywhere in the execution path.`,
+      '',
+      '### Target Function Details',
+      this.formatFunction(target),
+    ];
+
+    if (callers.length > 0) {
+      lines.push(
+        '',
+        '### Callers of Target (functions that call the target — use these to trace upstream to entry points)',
+        '',
+        ...callers.map((f) => this.formatFunction(f)),
+      );
+    }
+
+    if (callees.length > 0) {
+      lines.push(
+        '',
+        '### Callees of Target (functions called by the target — downstream effects)',
+        '',
+        ...callees.map((f) => this.formatFunction(f)),
+      );
     }
 
     return lines.join('\n');

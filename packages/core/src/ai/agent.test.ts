@@ -531,6 +531,126 @@ describe('ScenarioDiscoveryAgent', () => {
     expect(scenarios[1].pathType).toBe('happy');
     expect(scenarios[2].pathType).toBeUndefined();
   });
+
+  it('includes target function and callers/callees in the prompt', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([
+      {
+        id: 'login-validates-creds',
+        name: 'Login Validates Credentials',
+        description: 'User logs in, which calls validateCredentials to check the password hash',
+        entryFunction: 'handleLogin',
+        triggerCondition: 'POST /login',
+        confidence: 0.9,
+        expectedPath: ['handleLogin', 'validateCredentials'],
+      },
+    ]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    await agent.discover({
+      entryPoints: [
+        { id: 'f1', name: 'handleLogin', signature: 'handleLogin(): void', filePath: 'src/auth.ts' },
+      ],
+      eventHandlers: [],
+      publicAPIs: [],
+      targetFunction: {
+        id: 'f2',
+        name: 'validateCredentials',
+        qualifiedName: 'AuthService.validateCredentials',
+        signature: 'validateCredentials(email: string, hash: string): boolean',
+        filePath: 'src/auth/login.ts',
+      },
+      targetCallers: [
+        {
+          id: 'f1',
+          name: 'handleLogin',
+          qualifiedName: 'handleLogin',
+          signature: 'handleLogin(): void',
+          filePath: 'src/auth.ts',
+        },
+      ],
+      targetCallees: [
+        {
+          id: 'f3',
+          name: 'hashPassword',
+          qualifiedName: 'hashPassword',
+          signature: 'hashPassword(pw: string): string',
+          filePath: 'src/crypto.ts',
+        },
+      ],
+    });
+
+    // Verify the prompt includes the target function section
+    const userContent = mock.receivedMessages[0].find((m) => m.role === 'user')?.content ?? '';
+    expect(userContent).toContain('Target Function');
+    expect(userContent).toContain('AuthService.validateCredentials');
+    expect(userContent).toContain('Callers of Target');
+    expect(userContent).toContain('handleLogin');
+    expect(userContent).toContain('Callees of Target');
+    expect(userContent).toContain('hashPassword');
+
+    // Verify the system prompt is tailored for target function discovery
+    const systemContent = mock.receivedMessages[0].find((m) => m.role === 'system')?.content ?? '';
+    expect(systemContent).toContain('validateCredentials');
+    expect(systemContent).toContain('MUST include');
+    expect(systemContent).toContain('ANYWHERE');
+    expect(systemContent).toContain('CALLERS');
+  });
+
+  it('system prompt adapts when targetFunction is set', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    await agent.discover({
+      entryPoints: [
+        { id: 'f1', name: 'main', signature: 'main(): void', filePath: 'src/index.ts' },
+      ],
+      eventHandlers: [],
+      publicAPIs: [],
+      targetFunction: {
+        id: 'f2',
+        name: 'doWork',
+        qualifiedName: 'Worker.doWork',
+        signature: 'doWork(data: Buffer): Promise<void>',
+        filePath: 'src/worker.ts',
+      },
+    });
+
+    const systemContent = mock.receivedMessages[0].find((m) => m.role === 'system')?.content ?? '';
+
+    // Should mention target function in the analysis strategy
+    expect(systemContent).toContain('Worker.doWork');
+    expect(systemContent).toContain('TARGET FUNCTION');
+
+    // Should NOT have the generic "study the entry points" first step
+    // (the target-mode strategy leads with studying the target)
+    expect(systemContent).not.toContain('1. Study the entry points');
+    expect(systemContent).toContain('Study the TARGET FUNCTION');
+  });
+
+  it('system prompt uses generic strategy when no targetFunction', async () => {
+    const mock = makeMock();
+    mock.addResponses(JSON.stringify([]));
+
+    const agent = new ScenarioDiscoveryAgent(mock);
+    await agent.discover({
+      entryPoints: [
+        { id: 'f1', name: 'main', signature: 'main(): void', filePath: 'src/index.ts' },
+      ],
+      eventHandlers: [],
+      publicAPIs: [],
+      // No targetFunction
+    });
+
+    const systemContent = mock.receivedMessages[0].find((m) => m.role === 'system')?.content ?? '';
+
+    // Should use generic strategy
+    expect(systemContent).toContain('Study the entry points');
+    // Should NOT mention target-function-specific instructions
+    expect(systemContent).not.toContain('TARGET FUNCTION');
+    expect(systemContent).not.toContain('CALLERS');
+  });
 });
 
 // ---------------------------------------------------------------------------
