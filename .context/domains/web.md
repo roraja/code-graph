@@ -2,7 +2,7 @@
 
 ## Scope
 
-React + Vite single-page application with graph visualization. Located in `packages/web/`.
+React + Vite single-page application with graph visualization. Located in `packages/web/`. Connects to the server via REST API (not GraphQL).
 
 ## Key Technologies
 
@@ -12,27 +12,52 @@ React + Vite single-page application with graph visualization. Located in `packa
 | Vite 5 | Build tool + dev server |
 | Cytoscape.js | Call graph visualization |
 | Zustand | State management |
-| Apollo Client | GraphQL client (connects to server) |
-| React Router | Client-side routing |
 
-## Structure
+## Key Files
 
-```
-src/
-├── components/         # React components
-│   ├── ScenarioList    # Browse discovered scenarios
-│   ├── ScenarioDetail  # View scenario with steps
-│   ├── Walkthrough     # Step-by-step walkthrough UI
-│   ├── CallGraph       # Cytoscape.js graph visualization
-│   └── CorrectionChat  # Submit corrections in natural language
-├── stores/             # Zustand state stores
-└── main.tsx            # Vite entry point
-```
+| File | Purpose |
+|------|---------|
+| `src/main.tsx` | Vite entry point — renders `<App />` |
+| `src/App.tsx` | Root component — layout and routing |
+| `src/api.ts` | REST API client — typed fetch wrappers for all `/api/*` endpoints |
+| `src/types.ts` | Shared TypeScript types (`Scenario`, `ScenarioStep`, `FunctionNode`, `CallEdge`, `BranchNode`, `Correction`, `CorrectionResult`, `GraphData`, `GraphNode`, `GraphEdge`, `DatabaseStats`, etc.) |
+| `src/stores/scenario.ts` | `useScenarioStore` — Zustand store for scenarios, steps, variable state, corrections |
+| `src/stores/graph.ts` | `useGraphStore` — Zustand store for graph visualization nodes, edges, layout, filtering |
+| **Components** | |
+| `src/components/ScenarioList.tsx` | Browse discovered scenarios |
+| `src/components/ScenarioDetail.tsx` | View scenario with steps |
+| `src/components/Walkthrough.tsx` | Step-by-step walkthrough UI |
+| `src/components/CallGraph.tsx` | Cytoscape.js graph visualization |
+| `src/components/CorrectionChat.tsx` | Submit corrections in natural language |
+| `src/components/Header.tsx` | Application header/navigation |
+| `src/components/JustificationPanel.tsx` | Display step justifications and assumptions |
+
+## API Client
+
+The web UI communicates with the server via REST API (`/api/*`), not GraphQL. The `api.ts` module provides typed functions:
+
+- `fetchScenarios()`, `fetchScenario(id)`, `fetchSteps(scenarioId, from?, to?)`
+- `discoverScenarios(hint?)`, `traceScenario(scenarioId)`
+- `submitCorrection(scenarioId, message, stepId?)`
+- `searchFunctions(query, limit?)`, `getCallers(functionId)`, `getCallees(functionId)`
+- `fetchGraphData(scenarioId)`, `getStats()`
+
+## Zustand Stores
+
+### `useScenarioStore`
+Manages: `scenarios`, `currentScenario`, `steps`, `totalSteps`, `currentStep`, `variableState`, `loading`, `error`.
+Actions: `fetchScenarios()`, `fetchScenario(id)`, `fetchSteps(scenarioId)`, `setCurrentStep(index)`, `submitCorrection()`.
+Variable state is computed by merging step variable states up to the current step index.
+
+### `useGraphStore`
+Manages: `nodes`, `edges`, `layout` (LayoutName: dagre/breadthfirst/cose/circle/grid), `filterText`, `loading`, `error`.
+Actions: `fetchGraphData(scenarioId)`, `setLayout()`, `filterNodes()`.
+Derived: `getFilteredNodes()`, `getFilteredEdges()`.
 
 ## Patterns
 
 - **Zustand stores**: State management over Redux — simpler API, no boilerplate
-- **Apollo Client**: GraphQL queries/mutations to `@codegraph/server`
+- **REST API client**: Direct fetch to `/api/*` with typed response parsing
 - **Cytoscape.js**: Declarative graph rendering for call paths and class hierarchies
 - **Vite**: HMR dev server (`npm run dev`), production build (`npm run build`)
 - **tsconfig**: Uses ESNext module (browser target), not Node16 like other packages

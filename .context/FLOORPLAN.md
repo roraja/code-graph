@@ -41,8 +41,12 @@ Four npm workspace packages: **core** (engines), **cli** (Commander.js), **serve
     ↑
 @codegraph/cli   ← depends on core
 @codegraph/server ← depends on core
-@codegraph/web   ← standalone (connects to server via GraphQL at runtime)
+@codegraph/web   ← standalone (connects to server via REST API at runtime)
 ```
+
+## Configuration Location
+
+Config lives at `.vscode/code-graph/codegraph.yaml` (primary) with fallback to legacy `.codegraph.yaml`. The `findProjectRoot()` function walks up the directory tree checking both locations.
 
 ## File Naming Conventions
 
@@ -64,7 +68,7 @@ These apply everywhere in the codebase:
 - **No raw Cypher**: Use typed `QueryEngine` methods in public API, not raw query strings
 - **Mock AI**: All AI-dependent code must work with `MockAIProvider` (`CODEGRAPH_AI_MOCK=true`)
 - **Conventional Commits**: `feat:`, `fix:`, `docs:`, `refactor:`, etc.
-- **No credentials in code**: Use `${ENV_VAR}` substitution in `.codegraph.yaml`
+- **No credentials in code**: Use `${ENV_VAR}` substitution in config YAML
 
 ## Quick Troubleshooting
 
@@ -74,6 +78,6 @@ These apply everywhere in the codebase:
 | Tests fail with "Cannot find module @codegraph/core" | Build core first: `cd packages/core && npm run build` |
 | Integration tests fail | Is Neo4j running? `docker ps` or check `bolt://localhost:7687` |
 | AI tests fail with auth errors | Set `CODEGRAPH_AI_MOCK=true` or provide `CODEGRAPH_AI_API_KEY` |
-| Config not found | `findProjectRoot()` walks up from cwd looking for `.codegraph.yaml` |
+| Config not found | `findProjectRoot()` looks for `.vscode/code-graph/codegraph.yaml` then `.codegraph.yaml` |
 | Web UI shows blank page | Build web: `cd packages/web && npm run build`, then `codegraph serve` |
 | Lint errors on test files | Tests are `.ts` not `.tsx` — check `--ext` flag matches |

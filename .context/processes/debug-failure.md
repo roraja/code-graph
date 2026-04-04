@@ -41,6 +41,7 @@ Load the relevant domain context from `.context/domains/`.
 - Use `CODEGRAPH_LOG_LEVEL=debug` for verbose logging
 - For Neo4j issues: check connection at `bolt://localhost:7687` and browser at `http://localhost:7474`
 - For AI issues: try `CODEGRAPH_AI_MOCK=true` to rule out API problems
+- For config issues: `findProjectRoot()` looks for `.vscode/code-graph/codegraph.yaml` then `.codegraph.yaml`
 
 ### Step 4: Fix and Verify
 

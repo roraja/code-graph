@@ -15,20 +15,23 @@ Load: `.context/domains/core.md`
 
 ```ts
 export interface ICodeParser {
+  readonly languages: string[];
   parseFile(filePath: string): Promise<ParseResult>;
-  parseDirectory(dirPath: string, options?: ParseOptions): Promise<ParseResult>;
-  resolveDispatch(callEdge: CallEdge, typeContext: TypeContext): Promise<DispatchResolution[]>;
-  findImplementations(className: string, methodName: string): Promise<FunctionNode[]>;
+  parseDirectory(rootDir: string, options?: { exclude?: string[]; include?: string[] }): Promise<ParseResult[]>;
+  resolveDispatch(callSite: CallSite, context: DispatchContext): Promise<DispatchResolution[]>;
+  findImplementations(method: FunctionNode): Promise<FunctionNode[]>;
 }
 ```
 
 3. Your parser must produce `ParseResult` containing:
-   - `FunctionNode[]` — functions/methods with signature, parameters, return type, visibility, docs
-   - `ClassNode[]` — classes with inheritance, methods, properties
-   - `CallEdge[]` — function call relationships with line numbers
-   - `BranchNode[]` — if/else, switch, ternary with condition text
-   - `VariableNode[]` — variable declarations with type and scope
-   - `InheritanceEdge[]` — class hierarchy relationships
+   - `FunctionNode[]` — functions/methods with id, name, qualifiedName, signature, parameters (`ParameterInfo[]`), return type, visibility, source code, docs
+   - `ClassNode[]` — classes with inheritance, methods, properties (`PropertyInfo[]`)
+   - `CallEdge[]` — function call relationships with line numbers, virtual dispatch flag
+   - `BranchNode[]` — if/else, switch, ternary with condition text and line ranges
+   - `VariableNode[]` — variable declarations with type, scope (`local`/`parameter`/`member`/`global`/`property`), and owner
+   - `InheritanceEdge[]` — class hierarchy relationships (`extends`/`implements`)
+   - `contentHash: string` — for incremental parsing
+   - `parseTimeMs: number` — performance tracking
 
 ### Step 2: Add Content Hashing
 
@@ -36,8 +39,8 @@ Implement content hashing for incremental parsing — only re-parse files whose 
 
 ### Step 3: Update Configuration
 
-1. Add the new language to the `languages` array in the Zod config schema (`packages/core/src/config/loader.ts`)
-2. Add parser-specific config section if needed (like `parser.typescript.tsconfig` or `parser.cpp.compileCommands`)
+1. Add the new language to the `languages` array in the `project` section of the Zod config schema (`packages/core/src/config/loader.ts`)
+2. Add a parser-specific config section with its own Zod schema if needed (like `TsParserConfigSchema` for TypeScript or `CppParserConfigSchema` for C++), then add it to the `parser` section of `CodeGraphConfigSchema`
 
 ### Step 4: Write Tests
 

@@ -16,7 +16,7 @@ Create `packages/cli/src/commands/<command-name>.ts`:
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { createContext } from '../helpers.js';
+import { loadContext, startSpinner, handleError } from '../helpers.js';
 
 export function registerMyCommandCommand(program: Command): void {
   program
@@ -26,15 +26,15 @@ export function registerMyCommandCommand(program: Command): void {
     .option('--flag <value>', 'Flag description', 'default')
     .option('-f, --format <format>', 'Output format', 'table')
     .action(async (arg, opts) => {
-      const spinner = ora('Loading...').start();
+      const spinner = startSpinner('Loading...');
       try {
-        const ctx = await createContext(opts);
+        const ctx = await loadContext(opts.config);
         // ... command logic using ctx.queryEngine, ctx.scenarioEngine, etc.
         spinner.succeed(chalk.green('Done'));
+        await ctx.driver.disconnect();
       } catch (error) {
         spinner.fail(chalk.red('Failed'));
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(chalk.red(message));
+        handleError(error, opts.verbose);
         process.exit(1);
       }
     });
@@ -55,7 +55,8 @@ registerMyCommandCommand(program);
 
 If the command needs core engines not already in `CLIContext`, update `helpers.ts`:
 - Add the engine to `CLIContext` or `FullCLIContext` interface
-- Wire it up in `createContext()` or `createFullContext()`
+- Wire it up in `loadContext()` or `loadFullContext()`
+- For commands needing AI agents (tracing, discovery, corrections), use `loadFullContext()` instead of `loadContext()`
 
 ### Step 4: Test
 
