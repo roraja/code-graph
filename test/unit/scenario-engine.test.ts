@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   ScenarioEngine,
+  normalizeTags,
   type CreateScenarioInput,
   type ScenarioStep,
 } from '../../packages/core/src/scenario/engine.js';
@@ -37,6 +38,7 @@ const sampleInput: CreateScenarioInput = {
   triggerCondition: 'User drags a file onto the drop zone',
   discoveredBy: 'human',
   confidence: 0.95,
+  tags: ['#dragdrop', '#clipboard'],
 };
 
 function makeSteps(scenarioId: string): Omit<ScenarioStep, 'scenarioId'>[] {
@@ -86,6 +88,7 @@ describe('ScenarioEngine', () => {
       expect(scenario.confidence).toBe(0.95);
       expect(scenario.version).toBe(1);
       expect(scenario.entryFunction).toBe('handleUserFileDrop');
+      expect(scenario.tags).toEqual(['#dragdrop', '#clipboard']);
       expect(driver.run).toHaveBeenCalledTimes(1);
     });
 
@@ -94,7 +97,7 @@ describe('ScenarioEngine', () => {
       expect(scenario.id).toBe('user-drops-a-file');
     });
 
-    it('defaults discoveredBy to human and confidence to 1.0', async () => {
+    it('defaults discoveredBy to human, confidence to 1.0, and tags to empty', async () => {
       const input: CreateScenarioInput = {
         name: 'Minimal scenario',
         description: 'Test',
@@ -105,6 +108,7 @@ describe('ScenarioEngine', () => {
 
       expect(scenario.discoveredBy).toBe('human');
       expect(scenario.confidence).toBe(1.0);
+      expect(scenario.tags).toEqual([]);
     });
 
     it('sets createdAt and updatedAt timestamps', async () => {
@@ -134,6 +138,7 @@ describe('ScenarioEngine', () => {
             status: 'draft',
             entryFunction: 'main',
             triggerCondition: 'startup',
+            tags: JSON.stringify(['#auth', '#login']),
             version: 1,
             createdAt: '2024-01-01T00:00:00.000Z',
             updatedAt: '2024-01-01T00:00:00.000Z',
@@ -147,6 +152,7 @@ describe('ScenarioEngine', () => {
       expect(result!.id).toBe('test-id');
       expect(result!.name).toBe('Test');
       expect(result!.discoveredBy).toBe('ai');
+      expect(result!.tags).toEqual(['#auth', '#login']);
     });
   });
 
@@ -299,5 +305,196 @@ describe('ScenarioEngine', () => {
       expect(call[0]).toContain('functionId: $functionId');
       expect(call[1].functionId).toBe('src/pipeline.ts:15');
     });
+  });
+
+  describe('tags', () => {
+    it('persists tags when creating a scenario', async () => {
+      const scenario = await engine.createScenario({
+        ...sampleInput,
+        tags: ['#clipboard', '#DragDrop', 'security'],
+      });
+
+      expect(scenario.tags).toEqual(['#clipboard', '#dragdrop', '#security']);
+
+      const call = (driver.run as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(call[1].tags).toBe(JSON.stringify(['#clipboard', '#dragdrop', '#security']));
+    });
+
+    it('normalizes tags: adds # prefix, lowercases, deduplicates', async () => {
+      const scenario = await engine.createScenario({
+        ...sampleInput,
+        name: 'Tag test',
+        tags: ['Clipboard', '#clipboard', '#Auth', 'AUTH'],
+      });
+
+      expect(scenario.tags).toEqual(['#clipboard', '#auth']);
+    });
+
+    it('defaults tags to empty array when not provided', async () => {
+      const scenario = await engine.createScenario({
+        name: 'No tags',
+        description: 'Test',
+        entryFunction: 'main',
+        triggerCondition: 'Startup',
+      });
+
+      expect(scenario.tags).toEqual([]);
+    });
+
+    it('setTags replaces all tags on a scenario', async () => {
+      // Mock getScenario to return a scenario (needed for addTags/removeTags but not setTags)
+      await engine.setTags('test-id', ['#newTag1', '#newTag2']);
+
+      const call = (driver.run as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(call[0]).toContain('SET s.tags = $tags');
+      expect(call[1].tags).toBe(JSON.stringify(['#newtag1', '#newtag2']));
+    });
+
+    it('addTags merges with existing tags', async () => {
+      const existingScenario = {
+        s: {
+          properties: {
+            id: 'test-id',
+            name: 'Test',
+            description: '',
+            discoveredBy: 'human',
+            confidence: 1,
+            status: 'draft',
+            entryFunction: 'main',
+            triggerCondition: '',
+            tags: JSON.stringify(['#existing']),
+            version: 1,
+            createdAt: '',
+            updatedAt: '',
+          },
+        },
+      };
+
+      // First call: getScenario, second call: setTags
+      (driver.run as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(mockQueryResult([existingScenario]))
+        .mockResolvedValue(mockQueryResult());
+
+      await engine.addTags('test-id', ['#newTag']);
+
+      const setCalls = (driver.run as ReturnType<typeof vi.fn>).mock.calls;
+      const setTagsCall = setCalls.find(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('SET s.tags = $tags')
+      );
+      expect(setTagsCall).toBeDefined();
+      const savedTags = JSON.parse(setTagsCall![1].tags as string);
+      expect(savedTags).toContain('#existing');
+      expect(savedTags).toContain('#newtag');
+    });
+
+    it('removeTags removes specific tags', async () => {
+      const existingScenario = {
+        s: {
+          properties: {
+            id: 'test-id',
+            name: 'Test',
+            description: '',
+            discoveredBy: 'human',
+            confidence: 1,
+            status: 'draft',
+            entryFunction: 'main',
+            triggerCondition: '',
+            tags: JSON.stringify(['#keep', '#remove']),
+            version: 1,
+            createdAt: '',
+            updatedAt: '',
+          },
+        },
+      };
+
+      (driver.run as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(mockQueryResult([existingScenario]))
+        .mockResolvedValue(mockQueryResult());
+
+      await engine.removeTags('test-id', ['#remove']);
+
+      const setCalls = (driver.run as ReturnType<typeof vi.fn>).mock.calls;
+      const setTagsCall = setCalls.find(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('SET s.tags = $tags')
+      );
+      expect(setTagsCall).toBeDefined();
+      const savedTags = JSON.parse(setTagsCall![1].tags as string);
+      expect(savedTags).toEqual(['#keep']);
+    });
+
+    it('listScenarios filters by tags when provided', async () => {
+      const records = [
+        { s: { properties: { id: 's1', name: 'S1', description: '', discoveredBy: 'human', confidence: 1, status: 'draft', entryFunction: 'fn1', triggerCondition: '', tags: JSON.stringify(['#auth', '#login']), version: 1, createdAt: '', updatedAt: '' } } },
+        { s: { properties: { id: 's2', name: 'S2', description: '', discoveredBy: 'ai', confidence: 0.5, status: 'traced', entryFunction: 'fn2', triggerCondition: '', tags: JSON.stringify(['#api']), version: 2, createdAt: '', updatedAt: '' } } },
+      ];
+      (driver.run as ReturnType<typeof vi.fn>).mockResolvedValue(mockQueryResult(records));
+
+      const scenarios = await engine.listScenarios(undefined, ['#auth']);
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].id).toBe('s1');
+    });
+
+    it('listScenarios returns all when no tags filter', async () => {
+      const records = [
+        { s: { properties: { id: 's1', name: 'S1', description: '', discoveredBy: 'human', confidence: 1, status: 'draft', entryFunction: 'fn1', triggerCondition: '', tags: JSON.stringify(['#auth']), version: 1, createdAt: '', updatedAt: '' } } },
+        { s: { properties: { id: 's2', name: 'S2', description: '', discoveredBy: 'ai', confidence: 0.5, status: 'traced', entryFunction: 'fn2', triggerCondition: '', tags: JSON.stringify([]), version: 2, createdAt: '', updatedAt: '' } } },
+      ];
+      (driver.run as ReturnType<typeof vi.fn>).mockResolvedValue(mockQueryResult(records));
+
+      const scenarios = await engine.listScenarios();
+      expect(scenarios).toHaveLength(2);
+    });
+
+    it('recordToScenario handles missing tags gracefully', async () => {
+      const record = {
+        s: {
+          properties: {
+            id: 'no-tags',
+            name: 'No Tags',
+            description: '',
+            discoveredBy: 'human',
+            confidence: 1,
+            status: 'draft',
+            entryFunction: 'main',
+            triggerCondition: '',
+            // no tags field
+            version: 1,
+            createdAt: '',
+            updatedAt: '',
+          },
+        },
+      };
+      (driver.run as ReturnType<typeof vi.fn>).mockResolvedValue(mockQueryResult([record]));
+
+      const result = await engine.getScenario('no-tags');
+      expect(result).not.toBeNull();
+      expect(result!.tags).toEqual([]);
+    });
+  });
+});
+
+describe('normalizeTags', () => {
+  it('adds # prefix when missing', () => {
+    expect(normalizeTags(['clipboard'])).toEqual(['#clipboard']);
+  });
+
+  it('lowercases tags', () => {
+    expect(normalizeTags(['#DragDrop'])).toEqual(['#dragdrop']);
+  });
+
+  it('preserves hyphens and numbers', () => {
+    expect(normalizeTags(['#cl-232445'])).toEqual(['#cl-232445']);
+  });
+
+  it('deduplicates tags', () => {
+    expect(normalizeTags(['#auth', '#Auth', 'auth'])).toEqual(['#auth']);
+  });
+
+  it('skips empty strings', () => {
+    expect(normalizeTags(['', '  ', '#valid'])).toEqual(['#valid']);
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(normalizeTags([])).toEqual([]);
   });
 });

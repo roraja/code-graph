@@ -30,6 +30,7 @@ export function registerScenariosCommand(program: Command): void {
     .command('scenarios')
     .description('List all scenarios')
     .option('--status <status>', 'Filter by status (draft, traced, validated, corrected)')
+    .option('--tags <tags>', 'Filter by tags (comma-separated, e.g., "#clipboard,#dragDrop")')
     .action(async (opts, cmd) => {
       const verbose = cmd.parent?.opts().verbose ?? false;
       const configPath = cmd.parent?.opts().config;
@@ -38,14 +39,20 @@ export function registerScenariosCommand(program: Command): void {
         const ctx = await loadContext(configPath);
 
         const status = opts.status as ScenarioStatus | undefined;
+        const tags = opts.tags
+          ? (opts.tags as string).split(',').map((t: string) => t.trim())
+          : undefined;
         const spinner = startSpinner('Loading scenarios...');
-        const scenarios = await ctx.scenarioEngine.listScenarios(status);
+        const scenarios = await ctx.scenarioEngine.listScenarios(status, tags);
         spinner.succeed(`Found ${scenarios.length} scenario(s)`);
 
         if (scenarios.length === 0) {
           console.log(chalk.dim('  No scenarios found.'));
           if (status) {
             console.log(chalk.dim(`  (Filtered by status: ${status})`));
+          }
+          if (tags) {
+            console.log(chalk.dim(`  (Filtered by tags: ${tags.join(', ')})`));
           }
           console.log(
             chalk.dim('  Run ') +
@@ -64,9 +71,10 @@ export function registerScenariosCommand(program: Command): void {
             chalk.cyan('Name'),
             chalk.cyan('Status'),
             chalk.cyan('Confidence'),
+            chalk.cyan('Tags'),
             chalk.cyan('Updated'),
           ],
-          colWidths: [25, 30, 12, 12, 22],
+          colWidths: [25, 25, 12, 12, 20, 22],
           wordWrap: true,
         });
 
@@ -74,12 +82,14 @@ export function registerScenariosCommand(program: Command): void {
           const statusColor = getStatusColor(s.status);
           const confidence = (s.confidence * 100).toFixed(0) + '%';
           const updated = formatDate(s.updatedAt);
+          const tagsStr = s.tags.length > 0 ? s.tags.join(' ') : chalk.dim('—');
 
           table.push([
             s.id,
             s.name,
             statusColor(s.status),
             confidence,
+            tagsStr,
             updated,
           ]);
         }

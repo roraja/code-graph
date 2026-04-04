@@ -129,6 +129,19 @@
         "command": "codegraph.traceScenario",
         "title": "CodeGraph: Trace Scenario",
         "icon": "$(debug-start)"
+      },
+      {
+        "command": "codegraph.filterScenarios",
+        "title": "CodeGraph: Filter Scenarios by Tags",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "codegraph.addTags",
+        "title": "CodeGraph: Add Tags to Scenario"
+      },
+      {
+        "command": "codegraph.setTags",
+        "title": "CodeGraph: Set Tags on Scenario"
       }
     ],
     "menus": {
@@ -136,7 +149,12 @@
         {
           "command": "codegraph.refreshScenarios",
           "when": "view == codegraph.scenarios",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "codegraph.filterScenarios",
+          "when": "view == codegraph.scenarios",
+          "group": "navigation@2"
         },
         {
           "command": "codegraph.nextStep",
@@ -171,6 +189,14 @@
         },
         {
           "command": "codegraph.traceScenario",
+          "when": "view == codegraph.scenarios && viewItem == scenario"
+        },
+        {
+          "command": "codegraph.addTags",
+          "when": "view == codegraph.scenarios && viewItem == scenario"
+        },
+        {
+          "command": "codegraph.setTags",
           "when": "view == codegraph.scenarios && viewItem == scenario"
         },
         {

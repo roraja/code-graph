@@ -259,6 +259,57 @@ export async function discoverFromFunction(
 }
 
 /**
+ * Set the tags on a scenario, replacing any existing tags.
+ */
+export async function setTags(
+  scenarioId: string,
+  tags: string[],
+): Promise<void> {
+  logEntry('coreBridge.setTags', { scenarioId, tags });
+  try {
+    const c = await getClient();
+    await c.setTags(scenarioId, tags);
+    logExit('coreBridge.setTags');
+  } catch (err) {
+    logError('coreBridge.setTags', err);
+  }
+}
+
+/**
+ * Add tags to a scenario (merged with existing, no duplicates).
+ */
+export async function addTags(
+  scenarioId: string,
+  tags: string[],
+): Promise<void> {
+  logEntry('coreBridge.addTags', { scenarioId, tags });
+  try {
+    const c = await getClient();
+    await c.addTags(scenarioId, tags);
+    logExit('coreBridge.addTags');
+  } catch (err) {
+    logError('coreBridge.addTags', err);
+  }
+}
+
+/**
+ * Remove specific tags from a scenario.
+ */
+export async function removeTags(
+  scenarioId: string,
+  tags: string[],
+): Promise<void> {
+  logEntry('coreBridge.removeTags', { scenarioId, tags });
+  try {
+    const c = await getClient();
+    await c.removeTags(scenarioId, tags);
+    logExit('coreBridge.removeTags');
+  } catch (err) {
+    logError('coreBridge.removeTags', err);
+  }
+}
+
+/**
  * Trace a scenario to generate step-by-step execution walkthrough.
  * Reads the entry function, follows calls, asks AI to decide branches
  * and virtual dispatch, and saves the resulting steps to the graph.

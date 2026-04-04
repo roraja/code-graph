@@ -105,6 +105,109 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Filter scenarios by tags
+  log('debug', 'Registering command: codegraph.filterScenarios');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.filterScenarios', async () => {
+      logEntry('cmd:filterScenarios');
+      try {
+        const current = scenariosProvider.getFilterText();
+        const query = await vscode.window.showInputBox({
+          prompt: 'Filter scenarios by tags (e.g., #clipboard #dragDrop). Leave empty to clear.',
+          placeHolder: '#clipboard #auth',
+          value: current,
+        });
+        if (query === undefined) {
+          // User cancelled — do nothing
+          logExit('cmd:filterScenarios', 'cancelled');
+          return;
+        }
+        scenariosProvider.setFilter(query || undefined);
+        // Update the tree view description to show active filter
+        if (query) {
+          scenariosTreeView.description = `Filter: ${query}`;
+        } else {
+          scenariosTreeView.description = `v${context.extension.packageJSON.version}`;
+        }
+        logExit('cmd:filterScenarios', { query });
+      } catch (err) {
+        logError('cmd:filterScenarios', err);
+        throw err;
+      }
+    })
+  );
+
+  // Add tags to a scenario
+  log('debug', 'Registering command: codegraph.addTags');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.addTags', async (node: { scenario: { id: string; name: string; tags: string[] } }) => {
+      const scenarioId = node?.scenario?.id;
+      const scenarioName = node?.scenario?.name ?? scenarioId;
+      const currentTags = node?.scenario?.tags ?? [];
+      logEntry('cmd:addTags', { scenarioId });
+      try {
+        if (!scenarioId) { logExit('cmd:addTags', 'no scenarioId'); return; }
+        const input = await vscode.window.showInputBox({
+          prompt: `Add tags to "${scenarioName}" (space-separated, e.g., #clipboard #dragDrop)`,
+          placeHolder: '#clipboard #dragDrop #cl-232445',
+          value: currentTags.length > 0 ? currentTags.join(' ') + ' ' : '',
+        });
+        if (input === undefined) { logExit('cmd:addTags', 'cancelled'); return; }
+
+        // Parse all #tags from the input
+        const tagMatches = input.match(/#\S+/g);
+        if (!tagMatches || tagMatches.length === 0) {
+          vscode.window.showWarningMessage('No tags provided. Tags must start with # (e.g., #clipboard).');
+          logExit('cmd:addTags', 'no tags');
+          return;
+        }
+
+        await coreBridge.addTags(scenarioId, tagMatches);
+        scenariosProvider.refresh();
+        vscode.window.showInformationMessage(`Tags added to "${scenarioName}": ${tagMatches.join(' ')}`);
+        logExit('cmd:addTags', { tags: tagMatches });
+      } catch (err) {
+        logError('cmd:addTags', err);
+        throw err;
+      }
+    })
+  );
+
+  // Set tags on a scenario (replace all)
+  log('debug', 'Registering command: codegraph.setTags');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.setTags', async (node: { scenario: { id: string; name: string; tags: string[] } }) => {
+      const scenarioId = node?.scenario?.id;
+      const scenarioName = node?.scenario?.name ?? scenarioId;
+      const currentTags = node?.scenario?.tags ?? [];
+      logEntry('cmd:setTags', { scenarioId });
+      try {
+        if (!scenarioId) { logExit('cmd:setTags', 'no scenarioId'); return; }
+        const input = await vscode.window.showInputBox({
+          prompt: `Set tags for "${scenarioName}" (replaces existing tags, space-separated)`,
+          placeHolder: '#clipboard #dragDrop',
+          value: currentTags.join(' '),
+        });
+        if (input === undefined) { logExit('cmd:setTags', 'cancelled'); return; }
+
+        // Parse all #tags from the input (empty input clears tags)
+        const tagMatches = input.match(/#\S+/g) ?? [];
+
+        await coreBridge.setTags(scenarioId, tagMatches);
+        scenariosProvider.refresh();
+        if (tagMatches.length > 0) {
+          vscode.window.showInformationMessage(`Tags set on "${scenarioName}": ${tagMatches.join(' ')}`);
+        } else {
+          vscode.window.showInformationMessage(`Tags cleared on "${scenarioName}".`);
+        }
+        logExit('cmd:setTags', { tags: tagMatches });
+      } catch (err) {
+        logError('cmd:setTags', err);
+        throw err;
+      }
+    })
+  );
+
   // View scenario (opens step walker)
   log('debug', 'Registering command: codegraph.viewScenario');
   context.subscriptions.push(

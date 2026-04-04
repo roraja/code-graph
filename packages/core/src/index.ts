@@ -48,7 +48,7 @@ export { JustifierAgent } from './ai/justifier.js';
 export { CorrectionInterpreterAgent } from './ai/correction-interpreter.js';
 
 // --- Scenario Layer ---
-export { ScenarioEngine, type Scenario, type ScenarioStep, type CallStackFrame, type FrameVariable } from './scenario/engine.js';
+export { ScenarioEngine, normalizeTags, type Scenario, type ScenarioStep, type CreateScenarioInput, type CallStackFrame, type FrameVariable } from './scenario/engine.js';
 export { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
 
 // --- Correction Layer ---

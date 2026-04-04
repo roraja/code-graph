@@ -69,6 +69,8 @@ export const typeDefs = gql`
     status: ScenarioStatus!
     entryFunction: String!
     triggerCondition: String!
+    """User-defined tags for categorization and filtering."""
+    tags: [String!]!
     version: Int!
     createdAt: String!
     updatedAt: String!
@@ -230,6 +232,8 @@ export const typeDefs = gql`
   """Filter for listing scenarios."""
   input ScenarioFilter {
     status: ScenarioStatus
+    """Filter by tags — scenarios must have ALL specified tags."""
+    tags: [String!]
   }
 
   """Input for creating a new scenario."""
@@ -240,6 +244,8 @@ export const typeDefs = gql`
     triggerCondition: String!
     discoveredBy: String
     confidence: Float
+    """Tags for categorization (e.g., ["#clipboard", "#dragDrop"])."""
+    tags: [String!]
   }
 
   """Input for submitting a correction."""
@@ -330,5 +336,14 @@ export const typeDefs = gql`
 
     """Delete a scenario and all its steps."""
     deleteScenario(id: ID!): Boolean!
+
+    """Set the tags on a scenario, replacing any existing tags."""
+    setTags(scenarioId: ID!, tags: [String!]!): Scenario!
+
+    """Add tags to a scenario (merged with existing)."""
+    addTags(scenarioId: ID!, tags: [String!]!): Scenario!
+
+    """Remove specific tags from a scenario."""
+    removeTags(scenarioId: ID!, tags: [String!]!): Scenario!
   }
 `;

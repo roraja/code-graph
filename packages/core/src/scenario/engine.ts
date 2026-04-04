@@ -32,6 +32,8 @@ export interface Scenario {
   entryFunction: string;
   /** What triggers this scenario (e.g., "User drags a file") */
   triggerCondition: string;
+  /** User-defined tags for categorization and filtering (e.g., "#clipboard", "#dragDrop", "#cl-232445") */
+  tags: string[];
   /** Current version number */
   version: number;
   createdAt: string;
@@ -104,6 +106,32 @@ export interface CreateScenarioInput {
   triggerCondition: string;
   discoveredBy?: 'ai' | 'human';
   confidence?: number;
+  /** Tags for categorization (e.g., ["#clipboard", "#dragDrop"]) */
+  tags?: string[];
+}
+
+/**
+ * Normalize tags: ensure each tag starts with "#", lowercase, trim,
+ * and deduplicate. Tags without a "#" prefix get one added.
+ *
+ * Examples:
+ *   "clipboard"   → "#clipboard"
+ *   "#DragDrop"   → "#dragdrop"
+ *   "#cl-232445"  → "#cl-232445"
+ */
+export function normalizeTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of tags) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const tag = trimmed.startsWith('#') ? trimmed.toLowerCase() : `#${trimmed.toLowerCase()}`;
+    if (!seen.has(tag)) {
+      seen.add(tag);
+      result.push(tag);
+    }
+  }
+  return result;
 }
 
 /**
@@ -126,6 +154,8 @@ export class ScenarioEngine {
     const id = this.generateId(input.name);
     const now = new Date().toISOString();
 
+    const tags = normalizeTags(input.tags ?? []);
+
     const scenario: Scenario = {
       id,
       name: input.name,
@@ -135,6 +165,7 @@ export class ScenarioEngine {
       status: 'draft',
       entryFunction: input.entryFunction,
       triggerCondition: input.triggerCondition,
+      tags,
       version: 1,
       createdAt: now,
       updatedAt: now,
@@ -145,10 +176,11 @@ export class ScenarioEngine {
         id: $id, name: $name, description: $description,
         discoveredBy: $discoveredBy, confidence: $confidence,
         status: $status, entryFunction: $entryFunction,
-        triggerCondition: $triggerCondition, version: $version,
+        triggerCondition: $triggerCondition, tags: $tags,
+        version: $version,
         createdAt: $createdAt, updatedAt: $updatedAt
       })`,
-      { ...scenario }
+      { ...scenario, tags: JSON.stringify(tags) }
     );
 
     log.info(`Created scenario: ${scenario.name} (${scenario.id})`);
@@ -165,14 +197,26 @@ export class ScenarioEngine {
     return this.recordToScenario(result.records[0].toObject());
   }
 
-  /** List all scenarios with optional status filter */
-  async listScenarios(status?: ScenarioStatus): Promise<Scenario[]> {
+  /** List all scenarios with optional status and/or tag filters */
+  async listScenarios(status?: ScenarioStatus, tags?: string[]): Promise<Scenario[]> {
     const query = status
       ? 'MATCH (s:Scenario {status: $status}) RETURN s ORDER BY s.updatedAt DESC'
       : 'MATCH (s:Scenario) RETURN s ORDER BY s.updatedAt DESC';
 
     const results = await this.driver.run(query, { status });
-    return results.records.map(r => this.recordToScenario(r.toObject()));
+    let scenarios = results.records.map(r => this.recordToScenario(r.toObject()));
+
+    // Filter by tags in-memory (tags are stored as JSON strings in Neo4j)
+    if (tags && tags.length > 0) {
+      const normalizedFilterTags = normalizeTags(tags);
+      scenarios = scenarios.filter(s =>
+        normalizedFilterTags.every(filterTag =>
+          s.tags.some(scenarioTag => scenarioTag === filterTag)
+        )
+      );
+    }
+
+    return scenarios;
   }
 
   /** Update a scenario's status */
@@ -183,6 +227,40 @@ export class ScenarioEngine {
       { id, status, updatedAt: new Date().toISOString() }
     );
     log.info(`Updated scenario ${id} status to ${status}`);
+  }
+
+  /**
+   * Set the tags on a scenario, replacing any existing tags.
+   */
+  async setTags(id: string, tags: string[]): Promise<void> {
+    const normalized = normalizeTags(tags);
+    await this.driver.run(
+      `MATCH (s:Scenario {id: $id})
+       SET s.tags = $tags, s.updatedAt = $updatedAt`,
+      { id, tags: JSON.stringify(normalized), updatedAt: new Date().toISOString() }
+    );
+    log.info(`Set tags on scenario ${id}: ${normalized.join(', ')}`);
+  }
+
+  /**
+   * Add tags to a scenario (merged with existing, no duplicates).
+   */
+  async addTags(id: string, tags: string[]): Promise<void> {
+    const scenario = await this.getScenario(id);
+    if (!scenario) return;
+    const merged = normalizeTags([...scenario.tags, ...tags]);
+    await this.setTags(id, merged);
+  }
+
+  /**
+   * Remove specific tags from a scenario.
+   */
+  async removeTags(id: string, tags: string[]): Promise<void> {
+    const scenario = await this.getScenario(id);
+    if (!scenario) return;
+    const toRemove = new Set(normalizeTags(tags));
+    const remaining = scenario.tags.filter(t => !toRemove.has(t));
+    await this.setTags(id, remaining);
   }
 
   /**
@@ -333,6 +411,19 @@ export class ScenarioEngine {
   private recordToScenario(record: Record<string, unknown>): Scenario {
     const s = (record['s'] ?? record) as Record<string, unknown>;
     const props = (s['properties'] ?? s) as Record<string, unknown>;
+
+    let tags: string[] = [];
+    try {
+      const rawTags = props['tags'];
+      if (typeof rawTags === 'string') {
+        tags = JSON.parse(rawTags);
+      } else if (Array.isArray(rawTags)) {
+        tags = rawTags.map(String);
+      }
+    } catch {
+      // ignore parse errors — default to empty array
+    }
+
     return {
       id: String(props['id'] ?? ''),
       name: String(props['name'] ?? ''),
@@ -342,6 +433,7 @@ export class ScenarioEngine {
       status: (props['status'] as ScenarioStatus) ?? 'draft',
       entryFunction: String(props['entryFunction'] ?? ''),
       triggerCondition: String(props['triggerCondition'] ?? ''),
+      tags,
       version: Number(props['version'] ?? 1),
       createdAt: String(props['createdAt'] ?? ''),
       updatedAt: String(props['updatedAt'] ?? ''),

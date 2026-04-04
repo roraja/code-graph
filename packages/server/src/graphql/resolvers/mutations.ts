@@ -135,6 +135,7 @@ export const mutationResolvers = {
         triggerCondition: string;
         discoveredBy?: string;
         confidence?: number;
+        tags?: string[];
       };
     },
     ctx: ServerContext,
@@ -146,6 +147,7 @@ export const mutationResolvers = {
       triggerCondition: args.input.triggerCondition,
       discoveredBy: (args.input.discoveredBy as 'ai' | 'human') ?? 'human',
       confidence: args.input.confidence ?? 1.0,
+      tags: args.input.tags,
     });
   },
 
@@ -277,5 +279,63 @@ export const mutationResolvers = {
     }
     await ctx.scenarioEngine.deleteScenario(args.id);
     return true;
+  },
+
+  // ------------------------------------------------------------------
+  // Tags
+  // ------------------------------------------------------------------
+
+  /**
+   * Set the tags on a scenario, replacing any existing tags.
+   */
+  async setTags(
+    _parent: unknown,
+    args: { scenarioId: string; tags: string[] },
+    ctx: ServerContext,
+  ) {
+    const scenario = await ctx.scenarioEngine.getScenario(args.scenarioId);
+    if (!scenario) {
+      throw new GraphQLError(`Scenario not found: ${args.scenarioId}`, {
+        extensions: { code: 'NOT_FOUND' },
+      });
+    }
+    await ctx.scenarioEngine.setTags(args.scenarioId, args.tags);
+    return ctx.scenarioEngine.getScenario(args.scenarioId);
+  },
+
+  /**
+   * Add tags to a scenario (merged with existing, no duplicates).
+   */
+  async addTags(
+    _parent: unknown,
+    args: { scenarioId: string; tags: string[] },
+    ctx: ServerContext,
+  ) {
+    const scenario = await ctx.scenarioEngine.getScenario(args.scenarioId);
+    if (!scenario) {
+      throw new GraphQLError(`Scenario not found: ${args.scenarioId}`, {
+        extensions: { code: 'NOT_FOUND' },
+      });
+    }
+    await ctx.scenarioEngine.addTags(args.scenarioId, args.tags);
+    return ctx.scenarioEngine.getScenario(args.scenarioId);
+  },
+
+  /**
+   * Remove specific tags from a scenario.
+   */
+  async removeTags(
+    _parent: unknown,
+    args: { scenarioId: string; tags: string[] },
+    ctx: ServerContext,
+  ) {
+    const scenario = await ctx.scenarioEngine.getScenario(args.scenarioId);
+    if (!scenario) {
+      throw new GraphQLError(`Scenario not found: ${args.scenarioId}`, {
+        extensions: { code: 'NOT_FOUND' },
+      });
+    }
+    await ctx.scenarioEngine.removeTags(args.scenarioId, args.tags);
+    return ctx.scenarioEngine.getScenario(args.scenarioId);
   },
 };

@@ -16,7 +16,7 @@ import { GraphDriver } from './graph/driver.js';
 import { GraphSchema } from './graph/schema.js';
 import { CodeIndexer } from './graph/indexer.js';
 import { QueryEngine, type CallRelation } from './graph/queries.js';
-import { ScenarioEngine, type Scenario, type ScenarioStep, type CreateScenarioInput } from './scenario/engine.js';
+import { ScenarioEngine, type Scenario, type ScenarioStep, type CreateScenarioInput, normalizeTags } from './scenario/engine.js';
 import { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
 import { CorrectionEngine, type Correction, type StructuredCorrection } from './correction/engine.js';
 import { ScenarioDiscoveryAgent, type DiscoveredScenario, type ScenarioDiscoveryInput } from './ai/scenario-discovery.js';
@@ -74,6 +74,7 @@ function getMockScenarios(): Scenario[] {
       status: 'traced',
       entryFunction: 'AuthService.authenticateUser',
       triggerCondition: 'User submits login form with email and password',
+      tags: ['#auth', '#login'],
       version: 2,
       createdAt: '2024-01-15T10:30:00Z',
       updatedAt: now,
@@ -88,6 +89,7 @@ function getMockScenarios(): Scenario[] {
       status: 'validated',
       entryFunction: 'UserController.getUserProfile',
       triggerCondition: 'GET /api/users/:id is called',
+      tags: ['#api', '#auth'],
       version: 1,
       createdAt: '2024-01-16T14:00:00Z',
       updatedAt: now,
@@ -102,6 +104,7 @@ function getMockScenarios(): Scenario[] {
       status: 'draft',
       entryFunction: 'rateLimiter',
       triggerCondition: 'Any incoming HTTP request',
+      tags: ['#middleware', '#security'],
       version: 1,
       createdAt: '2024-01-17T09:00:00Z',
       updatedAt: now,
@@ -530,17 +533,26 @@ export class CodeGraphClient {
    * List all scenarios. Falls back to mock data when in mock mode.
    *
    * @param status - Optional status filter
+   * @param tags - Optional tag filter (scenarios must have all specified tags)
    */
   async listScenarios(
     status?: 'draft' | 'traced' | 'validated' | 'corrected',
+    tags?: string[],
   ): Promise<Scenario[]> {
     if (this.isMock) {
-      const all = getMockScenarios();
-      return status ? all.filter((s) => s.status === status) : all;
+      let all = getMockScenarios();
+      if (status) all = all.filter((s) => s.status === status);
+      if (tags && tags.length > 0) {
+        const normalized = normalizeTags(tags);
+        all = all.filter((s) =>
+          normalized.every((t) => s.tags.includes(t))
+        );
+      }
+      return all;
     }
 
     await this.ensureConnected();
-    return this.scenarioEngine!.listScenarios(status);
+    return this.scenarioEngine!.listScenarios(status, tags);
   }
 
   /**
@@ -571,6 +583,35 @@ export class CodeGraphClient {
     if (!scenario) return null;
     const steps = await this.scenarioEngine!.getSteps(id);
     return { scenario, steps };
+  }
+
+  /**
+   * Set the tags on a scenario, replacing any existing tags.
+   *
+   * Tags are normalized: lowercased, "#" prefix ensured, deduplicated.
+   */
+  async setTags(scenarioId: string, tags: string[]): Promise<void> {
+    if (this.isMock) return;
+    await this.ensureConnected();
+    await this.scenarioEngine!.setTags(scenarioId, tags);
+  }
+
+  /**
+   * Add tags to a scenario (merged with existing, no duplicates).
+   */
+  async addTags(scenarioId: string, tags: string[]): Promise<void> {
+    if (this.isMock) return;
+    await this.ensureConnected();
+    await this.scenarioEngine!.addTags(scenarioId, tags);
+  }
+
+  /**
+   * Remove specific tags from a scenario.
+   */
+  async removeTags(scenarioId: string, tags: string[]): Promise<void> {
+    if (this.isMock) return;
+    await this.ensureConnected();
+    await this.scenarioEngine!.removeTags(scenarioId, tags);
   }
 
   /**

@@ -22,17 +22,18 @@ export const queryResolvers = {
   // ------------------------------------------------------------------
 
   /**
-   * List all scenarios, optionally filtered by status.
+   * List all scenarios, optionally filtered by status and/or tags.
    */
   async scenarios(
     _parent: unknown,
-    args: { filter?: { status?: string } },
+    args: { filter?: { status?: string; tags?: string[] } },
     ctx: ServerContext,
   ) {
     const status = args.filter?.status as
       | 'draft' | 'traced' | 'validated' | 'corrected'
       | undefined;
-    return ctx.scenarioEngine.listScenarios(status);
+    const tags = args.filter?.tags;
+    return ctx.scenarioEngine.listScenarios(status, tags);
   },
 
   /**
@@ -163,7 +164,7 @@ export const queryResolvers = {
   },
 
   /**
-   * Search scenarios by name substring.
+   * Search scenarios by name, description, or tag substring.
    */
   async searchScenarios(
     _parent: unknown,
@@ -172,10 +173,23 @@ export const queryResolvers = {
   ) {
     const all = await ctx.scenarioEngine.listScenarios();
     const q = args.query.toLowerCase();
+
+    // If the query looks like tag filters (starts with #), filter by tags
+    const tagMatches = q.match(/#\S+/g);
+    if (tagMatches && tagMatches.length > 0) {
+      return all.filter(
+        (s: { tags: string[] }) =>
+          tagMatches.every(tag =>
+            s.tags.some(scenarioTag => scenarioTag === tag)
+          ),
+      );
+    }
+
     return all.filter(
-      (s: { name: string; description: string }) =>
+      (s: { name: string; description: string; tags: string[] }) =>
         s.name.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q),
+        s.description.toLowerCase().includes(q) ||
+        s.tags.some(tag => tag.includes(q)),
     );
   },
 

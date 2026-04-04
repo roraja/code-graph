@@ -67,13 +67,18 @@ export function createRestRouter(ctx: ServerContext): Router {
   // ------------------------------------------------------------------
 
   /**
-   * GET /api/scenarios — list scenarios with an optional status filter.
+   * GET /api/scenarios — list scenarios with optional status and tag filters.
    */
   router.get('/api/scenarios', async (req: Request, res: Response) => {
     try {
       const status = req.query.status as string | undefined;
+      const tagsParam = req.query.tags as string | string[] | undefined;
+      const tags = tagsParam
+        ? (Array.isArray(tagsParam) ? tagsParam : tagsParam.split(','))
+        : undefined;
       const scenarios = await ctx.scenarioEngine.listScenarios(
         status as 'draft' | 'traced' | 'validated' | 'corrected' | undefined,
+        tags,
       );
       res.json(scenarios);
     } catch (err) {
@@ -206,6 +211,67 @@ export function createRestRouter(ctx: ServerContext): Router {
         dispatchesResolved: result.dispatchesResolved,
         durationMs: result.durationMs,
       });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // Tags
+  // ------------------------------------------------------------------
+
+  /**
+   * PUT /api/scenarios/:id/tags — set (replace) tags on a scenario.
+   */
+  router.put('/api/scenarios/:id/tags', async (req: Request, res: Response) => {
+    try {
+      const scenario = await ctx.scenarioEngine.getScenario(req.params.id);
+      if (!scenario) {
+        res.status(404).json({ error: 'Scenario not found' });
+        return;
+      }
+      const tags: string[] = req.body?.tags ?? [];
+      await ctx.scenarioEngine.setTags(req.params.id, tags);
+      const updated = await ctx.scenarioEngine.getScenario(req.params.id);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * POST /api/scenarios/:id/tags — add tags to a scenario.
+   */
+  router.post('/api/scenarios/:id/tags', async (req: Request, res: Response) => {
+    try {
+      const scenario = await ctx.scenarioEngine.getScenario(req.params.id);
+      if (!scenario) {
+        res.status(404).json({ error: 'Scenario not found' });
+        return;
+      }
+      const tags: string[] = req.body?.tags ?? [];
+      await ctx.scenarioEngine.addTags(req.params.id, tags);
+      const updated = await ctx.scenarioEngine.getScenario(req.params.id);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * DELETE /api/scenarios/:id/tags — remove tags from a scenario.
+   */
+  router.delete('/api/scenarios/:id/tags', async (req: Request, res: Response) => {
+    try {
+      const scenario = await ctx.scenarioEngine.getScenario(req.params.id);
+      if (!scenario) {
+        res.status(404).json({ error: 'Scenario not found' });
+        return;
+      }
+      const tags: string[] = req.body?.tags ?? [];
+      await ctx.scenarioEngine.removeTags(req.params.id, tags);
+      const updated = await ctx.scenarioEngine.getScenario(req.params.id);
+      res.json(updated);
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
     }

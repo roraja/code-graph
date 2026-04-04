@@ -19,7 +19,8 @@ type ScenarioTreeNode = ScenarioNode | StepPreviewNode;
 class ScenarioNode extends vscode.TreeItem {
   constructor(public readonly scenario: Scenario) {
     super(scenario.name, vscode.TreeItemCollapsibleState.Collapsed);
-    this.description = `${scenario.status} | ${(scenario.confidence * 100).toFixed(0)}%`;
+    const tagStr = scenario.tags.length > 0 ? ` ${scenario.tags.join(' ')}` : '';
+    this.description = `${scenario.status} | ${(scenario.confidence * 100).toFixed(0)}%${tagStr}`;
     this.tooltip = new vscode.MarkdownString(
       `**${scenario.name}**\n\n` +
       `${scenario.description}\n\n` +
@@ -28,7 +29,8 @@ class ScenarioNode extends vscode.TreeItem {
       `- **Trigger:** ${scenario.triggerCondition}\n` +
       `- **Confidence:** ${(scenario.confidence * 100).toFixed(0)}%\n` +
       `- **Discovered by:** ${scenario.discoveredBy}\n` +
-      `- **Version:** ${scenario.version}`
+      `- **Version:** ${scenario.version}\n` +
+      (scenario.tags.length > 0 ? `- **Tags:** ${scenario.tags.join(', ')}\n` : '')
     );
     this.contextValue = 'scenario';
     this.iconPath = getStatusIcon(scenario.status);
@@ -108,6 +110,9 @@ function getActionIcon(action: string): vscode.ThemeIcon {
 
 /**
  * Tree data provider for the Scenarios view.
+ *
+ * Supports filtering by tags — type "#clipboard" or "#dragDrop #auth"
+ * in the search box to show only matching scenarios.
  */
 export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNode> {
   private _onDidChangeTreeData = new vscode.EventEmitter<ScenarioTreeNode | undefined | void>();
@@ -116,12 +121,45 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
   /** Cache of loaded scenario views (scenario + steps) */
   private viewCache = new Map<string, ScenarioView>();
 
+  /** Current tag filter (empty = show all) */
+  private filterTags: string[] = [];
+
+  /** Current raw filter text for display */
+  private filterText = '';
+
   refresh(): void {
     logEntry('ScenariosProvider.refresh');
     this.viewCache.clear();
     this._onDidChangeTreeData.fire();
     log('info', 'Scenarios tree refreshed');
     logExit('ScenariosProvider.refresh');
+  }
+
+  /**
+   * Set a search/filter string. Extracts "#tag" tokens for tag filtering.
+   * Setting `undefined` or empty string clears the filter.
+   */
+  setFilter(query: string | undefined): void {
+    logEntry('ScenariosProvider.setFilter', { query });
+    this.filterText = query?.trim() ?? '';
+    this.filterTags = [];
+
+    if (this.filterText) {
+      // Extract all #tag tokens from the query
+      const tagMatches = this.filterText.match(/#\S+/g);
+      if (tagMatches) {
+        this.filterTags = tagMatches.map(t => t.toLowerCase());
+      }
+    }
+
+    log('info', 'Scenarios filter updated', { filterText: this.filterText, filterTags: this.filterTags });
+    this._onDidChangeTreeData.fire();
+    logExit('ScenariosProvider.setFilter');
+  }
+
+  /** Get the current filter text */
+  getFilterText(): string {
+    return this.filterText;
   }
 
   getTreeItem(element: ScenarioTreeNode): vscode.TreeItem {
@@ -133,8 +171,18 @@ export class ScenariosProvider implements vscode.TreeDataProvider<ScenarioTreeNo
       logEntry('ScenariosProvider.getChildren', { elementType: 'root' });
       // Root level — list all scenarios
       try {
-        const scenarios = await coreBridge.listScenarios();
-        logExit('ScenariosProvider.getChildren', { count: scenarios.length });
+        let scenarios = await coreBridge.listScenarios();
+
+        // Apply tag filter if set
+        if (this.filterTags.length > 0) {
+          scenarios = scenarios.filter(s =>
+            this.filterTags.every(filterTag =>
+              s.tags.some(scenarioTag => scenarioTag === filterTag)
+            )
+          );
+        }
+
+        logExit('ScenariosProvider.getChildren', { count: scenarios.length, filtered: this.filterTags.length > 0 });
         return scenarios.map((s) => new ScenarioNode(s));
       } catch (err) {
         log('error', 'Failed to load scenarios for tree', {
