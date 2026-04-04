@@ -1,6 +1,6 @@
 /**
  * Step Detail Webview — renders the current scenario step's AI explanation,
- * variable state, source code, and metadata in a rich HTML sidebar panel.
+ * variable state, and metadata in a rich HTML sidebar panel.
  *
  * The tree-based Step Walker truncates long text. This webview gives the
  * user a full, readable view of the AI-generated justification, imagined
@@ -131,16 +131,6 @@ export class StepDetailViewProvider implements vscode.WebviewViewProvider {
       </section>`;
     }
 
-    // Build source code HTML
-    let sourceHtml = '';
-    if (step.sourceCode) {
-      sourceHtml = `
-      <section class="section">
-        <h3>Source Code</h3>
-        <pre class="source-code"><code>${escapeHtml(step.sourceCode)}</code></pre>
-      </section>`;
-    }
-
     // Build correction HTML
     let correctionHtml = '';
     if (step.correctedBy) {
@@ -176,7 +166,6 @@ export class StepDetailViewProvider implements vscode.WebviewViewProvider {
     <div class="explanation">${escapeHtml(step.justification)}</div>
   </section>
 
-  ${sourceHtml}
   ${variablesHtml}
   ${correctionHtml}
 </body>
@@ -215,7 +204,6 @@ export class StepDetailViewProvider implements vscode.WebviewViewProvider {
         --link: var(--vscode-textLink-foreground);
         --badge-bg: var(--vscode-badge-background);
         --badge-fg: var(--vscode-badge-foreground);
-        --code-bg: var(--vscode-textCodeBlock-background, rgba(128,128,128,0.1));
         --green: var(--vscode-charts-green, #4caf50);
         --yellow: var(--vscode-charts-yellow, #ff9800);
         --red: var(--vscode-charts-red, #f44336);
@@ -325,18 +313,6 @@ export class StepDetailViewProvider implements vscode.WebviewViewProvider {
         border-radius: 0 4px 4px 0;
         font-size: 13px;
         line-height: 1.6;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-      }
-
-      .source-code {
-        background: var(--code-bg);
-        padding: 8px 10px;
-        border-radius: 4px;
-        overflow-x: auto;
-        font-family: var(--vscode-editor-font-family, monospace);
-        font-size: 12px;
-        line-height: 1.4;
         white-space: pre-wrap;
         word-wrap: break-word;
       }
