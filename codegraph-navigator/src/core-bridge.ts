@@ -14,12 +14,13 @@ import {
   type CodeGraphClient,
   type ScenarioView,
   type CallRelation,
+  type CodeWalk,
 } from '@codegraph/core';
 import type { Scenario, ScenarioStep, FunctionNode } from '@codegraph/core';
 import { log, logEntry, logExit, logError } from './logger.js';
 
 /** Re-export types so the rest of the extension imports from here or @codegraph/core. */
-export type { Scenario, ScenarioStep, ScenarioView, CallRelation, FunctionNode as FunctionInfo };
+export type { Scenario, ScenarioStep, ScenarioView, CallRelation, CodeWalk, FunctionNode as FunctionInfo };
 
 /** The singleton client instance. */
 let client: CodeGraphClient | null = null;
@@ -335,6 +336,54 @@ export async function traceScenario(
     vscode.window.showErrorMessage(
       `CodeGraph: Trace failed — ${message}`,
     );
+    return null;
+  }
+}
+
+/**
+ * List all code walks from JSON files on disk.
+ */
+export async function listCodeWalks(): Promise<CodeWalk[]> {
+  logEntry('coreBridge.listCodeWalks');
+  try {
+    const c = await getClient();
+    const walks = await c.listCodeWalks();
+    logExit('coreBridge.listCodeWalks', { count: walks.length });
+    return walks;
+  } catch (err) {
+    logError('coreBridge.listCodeWalks', err);
+    return [];
+  }
+}
+
+/**
+ * Get a code walk by ID.
+ */
+export async function getCodeWalk(id: string): Promise<CodeWalk | null> {
+  logEntry('coreBridge.getCodeWalk', { id });
+  try {
+    const c = await getClient();
+    const walk = await c.getCodeWalk(id);
+    logExit('coreBridge.getCodeWalk', { found: !!walk });
+    return walk;
+  } catch (err) {
+    logError('coreBridge.getCodeWalk', err);
+    return null;
+  }
+}
+
+/**
+ * Get a code walk associated with a scenario.
+ */
+export async function getCodeWalkForScenario(scenarioId: string): Promise<CodeWalk | null> {
+  logEntry('coreBridge.getCodeWalkForScenario', { scenarioId });
+  try {
+    const c = await getClient();
+    const walk = await c.getCodeWalkForScenario(scenarioId);
+    logExit('coreBridge.getCodeWalkForScenario', { found: !!walk });
+    return walk;
+  } catch (err) {
+    logError('coreBridge.getCodeWalkForScenario', err);
     return null;
   }
 }

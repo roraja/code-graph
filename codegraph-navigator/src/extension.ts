@@ -24,8 +24,10 @@ import { StepWalkerProvider } from './providers/step-walker.js';
 import { StepDetailViewProvider } from './providers/step-detail-view.js';
 import { CallStackViewProvider } from './providers/call-stack-view.js';
 import { FunctionsProvider } from './providers/functions.js';
+import { CodeWalkCellsViewProvider } from './providers/codewalk-cells-view.js';
 import { openStepInEditor } from './decorations.js';
-import type { ScenarioStep, CallRelation, CallStackFrame } from '@codegraph/core';
+import { openCellInEditor } from './codewalk-decorations.js';
+import type { ScenarioStep, CallRelation, CallStackFrame, CodeWalk } from '@codegraph/core';
 
 export function activate(context: vscode.ExtensionContext): void {
   logEntry('activate', { extensionVersion: context.extension.packageJSON?.version });
@@ -57,6 +59,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const stepDetailViewProvider = new StepDetailViewProvider();
   const callStackViewProvider = new CallStackViewProvider();
   const functionsProvider = new FunctionsProvider();
+  const codeWalkCellsViewProvider = new CodeWalkCellsViewProvider();
 
   // Register tree data providers
   const scenariosTreeView = vscode.window.createTreeView('codegraph.scenarios', {
@@ -72,7 +75,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(CallStackViewProvider.viewType, callStackViewProvider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-    vscode.window.registerTreeDataProvider('codegraph.functions', functionsProvider)
+    vscode.window.registerTreeDataProvider('codegraph.functions', functionsProvider),
+    vscode.window.registerWebviewViewProvider(CodeWalkCellsViewProvider.viewType, codeWalkCellsViewProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
   );
 
   // --- Commands ---
@@ -615,6 +621,176 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     })
   );
+
+  // --- Code Walk Commands ---
+
+  // Open Code Walk for a scenario (from scenario context menu) or standalone
+  log('debug', 'Registering command: codegraph.openCodeWalk');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.openCodeWalk', async (node?: { scenario: { id: string; name: string } }) => {
+      const scenarioId = node?.scenario?.id;
+      const scenarioName = node?.scenario?.name ?? scenarioId;
+      logEntry('cmd:openCodeWalk', { scenarioId });
+      try {
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: scenarioId ? `Loading code walk for "${scenarioName}"...` : 'Loading code walks...' },
+          async () => {
+            let walk: CodeWalk | null = null;
+
+            // Try by scenarioId first
+            if (scenarioId) {
+              walk = await coreBridge.getCodeWalkForScenario(scenarioId);
+            }
+
+            // If no walk found by scenarioId, show a picker of all walks
+            if (!walk) {
+              const walks = await coreBridge.listCodeWalks();
+              if (walks.length === 0) {
+                vscode.window.showWarningMessage(
+                  'CodeGraph: No code walks found. Create one with the codewalk-populate skill.'
+                );
+                return;
+              }
+              if (walks.length === 1) {
+                // Only one walk, use it directly
+                walk = walks[0];
+              } else {
+                const picked = await vscode.window.showQuickPick(
+                  walks.map(w => ({
+                    label: w.name,
+                    description: `${w.cells.length} cells`,
+                    detail: w.description,
+                    walkId: w.id,
+                  })),
+                  { placeHolder: 'Select a code walk' }
+                );
+                if (!picked) { logExit('cmd:openCodeWalk', 'cancelled'); return; }
+                walk = await coreBridge.getCodeWalk(picked.walkId);
+              }
+            }
+
+            if (!walk) {
+              logExit('cmd:openCodeWalk', 'not found');
+              return;
+            }
+
+            codeWalkCellsViewProvider.loadWalk(walk);
+            // Focus the code walk view
+            await vscode.commands.executeCommand('codegraph.codeWalkCells.focus');
+            // Open the first cell in editor
+            const firstCell = codeWalkCellsViewProvider.getCurrentCell();
+            if (firstCell) {
+              await openCellInEditor(firstCell, workspaceRoot, walk);
+            }
+          }
+        );
+        logExit('cmd:openCodeWalk');
+      } catch (err) {
+        logError('cmd:openCodeWalk', err);
+        throw err;
+      }
+    })
+  );
+
+  // Open a Code Walk directly by ID
+  log('debug', 'Registering command: codegraph.openCodeWalkById');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.openCodeWalkById', async (walkOrId?: CodeWalk | string) => {
+      logEntry('cmd:openCodeWalkById');
+      try {
+        let walk: CodeWalk | null = null;
+
+        if (typeof walkOrId === 'string') {
+          walk = await coreBridge.getCodeWalk(walkOrId);
+        } else if (walkOrId && typeof walkOrId === 'object' && 'cells' in walkOrId) {
+          walk = walkOrId;
+        } else {
+          // Show a picker
+          const walks = await coreBridge.listCodeWalks();
+          if (walks.length === 0) {
+            vscode.window.showInformationMessage('CodeGraph: No code walks found.');
+            logExit('cmd:openCodeWalkById', 'no walks');
+            return;
+          }
+          const picked = await vscode.window.showQuickPick(
+            walks.map(w => ({
+              label: w.name,
+              description: `${w.cells.length} cells`,
+              detail: w.description,
+              walkId: w.id,
+            })),
+            { placeHolder: 'Select a code walk' }
+          );
+          if (!picked) { logExit('cmd:openCodeWalkById', 'cancelled'); return; }
+          walk = await coreBridge.getCodeWalk(picked.walkId);
+        }
+
+        if (!walk) {
+          vscode.window.showWarningMessage('CodeGraph: Code walk not found.');
+          logExit('cmd:openCodeWalkById', 'not found');
+          return;
+        }
+
+        codeWalkCellsViewProvider.loadWalk(walk);
+        await vscode.commands.executeCommand('codegraph.codeWalkCells.focus');
+        const firstCell = codeWalkCellsViewProvider.getCurrentCell();
+        if (firstCell) {
+          await openCellInEditor(firstCell, workspaceRoot, walk);
+        }
+        logExit('cmd:openCodeWalkById');
+      } catch (err) {
+        logError('cmd:openCodeWalkById', err);
+        throw err;
+      }
+    })
+  );
+
+  // Code Walk: Next Cell
+  log('debug', 'Registering command: codegraph.nextCell');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.nextCell', () => {
+      logEntry('cmd:nextCell');
+      try {
+        codeWalkCellsViewProvider.nextCell();
+        const cell = codeWalkCellsViewProvider.getCurrentCell();
+        const walk = codeWalkCellsViewProvider.getWalk();
+        if (cell && walk) {
+          openCellInEditor(cell, workspaceRoot, walk);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log('error', 'cmd:nextCell failed', { error: msg });
+      }
+      logExit('cmd:nextCell');
+    })
+  );
+
+  // Code Walk: Previous Cell
+  log('debug', 'Registering command: codegraph.prevCell');
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraph.prevCell', () => {
+      logEntry('cmd:prevCell');
+      try {
+        codeWalkCellsViewProvider.prevCell();
+        const cell = codeWalkCellsViewProvider.getCurrentCell();
+        const walk = codeWalkCellsViewProvider.getWalk();
+        if (cell && walk) {
+          openCellInEditor(cell, workspaceRoot, walk);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log('error', 'cmd:prevCell failed', { error: msg });
+      }
+      logExit('cmd:prevCell');
+    })
+  );
+
+  // Sync cell changes from webview to editor
+  codeWalkCellsViewProvider.onCellChanged((data) => {
+    if (data) {
+      openCellInEditor(data.cell, workspaceRoot, data.walk);
+    }
+  });
 
   // Clean up on deactivation
   context.subscriptions.push({

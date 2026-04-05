@@ -1,8 +1,8 @@
 {
   "name": "codegraph-navigator",
   "displayName": "CodeGraph Navigator",
-  "description": "Explore CodeGraph scenarios, walk through traced execution paths, and inspect functions — all from the VS Code sidebar.",
-  "version": "0.4.0",
+  "description": "Explore CodeGraph scenarios, walk through traced execution paths, browse code walks as notebook-style cells, and inspect functions — all from the VS Code sidebar.",
+  "version": "0.5.0",
   "publisher": "codegraph",
   "repository": {
     "type": "git",
@@ -24,7 +24,12 @@
       "activitybar": [
         {
           "id": "codegraph-navigator",
-          "title": "CodeGraph v0.4.0",
+          "title": "CodeGraph v0.5.0",
+          "icon": "media/codegraph-icon.svg"
+        },
+        {
+          "id": "codegraph-codewalk",
+          "title": "Code Walk",
           "icon": "media/codegraph-icon.svg"
         }
       ]
@@ -52,6 +57,13 @@
         {
           "id": "codegraph.functions",
           "name": "Functions"
+        }
+      ],
+      "codegraph-codewalk": [
+        {
+          "id": "codegraph.codeWalkCells",
+          "name": "Code Walk Cells",
+          "type": "webview"
         }
       ]
     },
@@ -151,6 +163,25 @@
       {
         "command": "codegraph.setTags",
         "title": "CodeGraph: Set Tags on Scenario"
+      },
+      {
+        "command": "codegraph.openCodeWalk",
+        "title": "CodeGraph: Open Code Walk",
+        "icon": "$(notebook)"
+      },
+      {
+        "command": "codegraph.openCodeWalkById",
+        "title": "CodeGraph: Open Code Walk by ID"
+      },
+      {
+        "command": "codegraph.nextCell",
+        "title": "CodeGraph: Next Cell",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "codegraph.prevCell",
+        "title": "CodeGraph: Previous Cell",
+        "icon": "$(arrow-up)"
       }
     ],
     "menus": {
@@ -184,6 +215,21 @@
           "command": "codegraph.searchFunctions",
           "when": "view == codegraph.functions",
           "group": "navigation"
+        },
+        {
+          "command": "codegraph.nextCell",
+          "when": "view == codegraph.codeWalkCells",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codegraph.prevCell",
+          "when": "view == codegraph.codeWalkCells",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codegraph.openCodeWalk",
+          "when": "view == codegraph.codeWalkCells",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -198,6 +244,10 @@
         },
         {
           "command": "codegraph.traceScenario",
+          "when": "view == codegraph.scenarios && viewItem == scenario"
+        },
+        {
+          "command": "codegraph.openCodeWalk",
           "when": "view == codegraph.scenarios && viewItem == scenario"
         },
         {
