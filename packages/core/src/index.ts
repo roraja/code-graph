@@ -52,6 +52,27 @@ export { ScenarioEngine, normalizeTags, type Scenario, type ScenarioStep, type C
 export { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
 export { ScenarioFileReader } from './scenario/file-reader.js';
 
+// --- Code Walk Layer ---
+export type {
+  CodeWalk,
+  WalkCell,
+  WalkMeta,
+  WalkContributor,
+  CellType,
+  CellStatus,
+  CodeSlice,
+  LineHighlight,
+  CellState,
+  CellScope,
+  CellVariable,
+  CellCallStackFrame,
+  DataSource,
+  CodeLocation,
+  CellCorrection,
+  CodeWalkFileData,
+} from './codewalk/types.js';
+export { CodeWalkFileReader } from './codewalk/file-reader.js';
+
 // --- Correction Layer ---
 export {
   CorrectionEngine,

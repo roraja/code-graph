@@ -19,6 +19,8 @@ import { QueryEngine, type CallRelation } from './graph/queries.js';
 import { ScenarioEngine, type Scenario, type ScenarioStep, type CreateScenarioInput, normalizeTags } from './scenario/engine.js';
 import { ScenarioTracer, type TraceConfig, type TraceResult } from './scenario/tracer.js';
 import { ScenarioFileReader } from './scenario/file-reader.js';
+import { CodeWalkFileReader } from './codewalk/file-reader.js';
+import type { CodeWalk } from './codewalk/types.js';
 import { CorrectionEngine, type Correction, type StructuredCorrection } from './correction/engine.js';
 import { ScenarioDiscoveryAgent, type DiscoveredScenario, type ScenarioDiscoveryInput } from './ai/scenario-discovery.js';
 import { PathTracerAgent } from './ai/path-tracer.js';
@@ -421,6 +423,7 @@ export class CodeGraphClient {
   private correctionEngine: CorrectionEngine | null = null;
   private config: CodeGraphConfig | null = null;
   private fileReader: ScenarioFileReader | null = null;
+  private codeWalkReader: CodeWalkFileReader | null = null;
   private readonly isMock: boolean;
   private readonly projectRoot: string | undefined;
   private connected = false;
@@ -430,10 +433,11 @@ export class CodeGraphClient {
     this.isMock = options.mock ?? false;
     this.projectRoot = options.projectRoot;
 
-    // Initialize file reader immediately — no database needed
+    // Initialize file readers immediately — no database needed
     const root = this.projectRoot ?? findProjectRoot() ?? undefined;
     if (root) {
       this.fileReader = new ScenarioFileReader(root);
+      this.codeWalkReader = new CodeWalkFileReader(root);
     }
   }
 
@@ -684,6 +688,40 @@ export class CodeGraphClient {
     }
 
     return matching;
+  }
+
+  // -----------------------------------------------------------------------
+  // Code Walks (Notebook-style cells)
+  // -----------------------------------------------------------------------
+
+  /**
+   * List all code walks from JSON files on disk.
+   */
+  async listCodeWalks(): Promise<CodeWalk[]> {
+    if (this.codeWalkReader) {
+      return this.codeWalkReader.listCodeWalks();
+    }
+    return [];
+  }
+
+  /**
+   * Get a code walk by ID.
+   */
+  async getCodeWalk(id: string): Promise<CodeWalk | null> {
+    if (this.codeWalkReader) {
+      return this.codeWalkReader.getCodeWalk(id);
+    }
+    return null;
+  }
+
+  /**
+   * Get a code walk associated with a scenario.
+   */
+  async getCodeWalkForScenario(scenarioId: string): Promise<CodeWalk | null> {
+    if (this.codeWalkReader) {
+      return this.codeWalkReader.getCodeWalkForScenario(scenarioId);
+    }
+    return null;
   }
 
   // -----------------------------------------------------------------------
