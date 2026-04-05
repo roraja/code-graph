@@ -20,3 +20,6 @@ codegraph discover --hint "GetUrlFromHDrop function in ui/base/clipboard/clipboa
 
 but it fails for some reason. Can you check and fix all the issues until you are able to generate scenariios related to this function (using the CLI tool as if a user was using it). Find and fix the issues.
 ---
+
+### Highlights and bookmarks
+- LLM should add highlight at steps which is core
