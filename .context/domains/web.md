@@ -30,6 +30,8 @@ React + Vite single-page application with graph visualization. Located in `packa
 | `src/components/ScenarioList.tsx` | Browse discovered scenarios |
 | `src/components/ScenarioDetail.tsx` | View scenario with steps |
 | `src/components/Walkthrough.tsx` | Step-by-step walkthrough UI |
+| `src/components/CallStackPanel.tsx` | Display call stack frames for current step with clickable navigation and confidence indicators |
+| `src/components/VariableDetailsPanel.tsx` | Display variable details for a selected call stack frame with confidence levels |
 | `src/components/CallGraph.tsx` | Cytoscape.js graph visualization |
 | `src/components/CorrectionChat.tsx` | Submit corrections in natural language |
 | `src/components/Header.tsx` | Application header/navigation |

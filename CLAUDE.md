@@ -55,7 +55,7 @@ Four npm workspace packages plus a VS Code extension with a strict dependency fl
 ```
 @codegraph/core   ← foundation (no deps on other packages)
     ↑
-@codegraph/cli    ← depends on core (Commander.js CLI, 18 commands)
+@codegraph/cli    ← depends on core (Commander.js CLI, 19 commands)
 @codegraph/server ← depends on core (Express + Apollo GraphQL API)
 @codegraph/web    ← standalone SPA (React + Vite, connects to server via REST + GraphQL at runtime)
 
@@ -126,6 +126,13 @@ catch (error) {
 }
 ```
 
+### Configuration
+- Project config: `.codegraph.yaml` (see `.codegraph.yaml.example`)
+- Zod schemas validate all config sections
+- Environment variable substitution: `${CODEGRAPH_NEO4J_PASSWORD}`
+- Key env vars: `CODEGRAPH_NEO4J_PASSWORD`, `CODEGRAPH_AI_API_KEY`, `CODEGRAPH_AI_MOCK`
+- Logging env vars: `CODEGRAPH_LOG_LEVEL`, `CODEGRAPH_LOG_JSON`, `CODEGRAPH_SILENT`
+
 ### Commit Messages
 Follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, etc.
 
@@ -133,7 +140,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `f
 
 1. **AI provider abstraction**: `AIProvider` interface with `OpenAIProvider` (production), `CopilotCLIProvider` (GitHub Copilot), and `MockAIProvider` (testing). Default provider is `copilot`. Set `CODEGRAPH_AI_MOCK=true` to test without an API key. All AI-dependent code must work with both providers.
 
-2. **CLI command registration**: Each command exports `registerXxxCommand(program: Command): void`. Entry point registers all 18 commands. Shared context via `CLIContext` / `FullCLIContext` from `helpers.ts`. Uses chalk (colored output), ora (spinners), inquirer (prompts), cli-table3 (tables).
+2. **CLI command registration**: Each command exports `registerXxxCommand(program: Command): void`. Entry point registers all 19 commands. Shared context via `CLIContext` / `FullCLIContext` from `helpers.ts`. Uses chalk (colored output), ora (spinners), inquirer (prompts), cli-table3 (tables).
 
 3. **Server context factory**: `createServerContext()` wires up all core engines. `startServer()` mounts REST (`/api/*`) + GraphQL (`/graphql`) + optional static web UI from `packages/web/dist`.
 
@@ -173,6 +180,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `f
 
 ## Things to Avoid
 
+- Never commit API keys or credentials — use environment variables
 - Never use raw Cypher results in public API — use typed `QueryEngine` methods
 - Never skip Zod validation when adding config fields
 - Never create CLI commands without the `registerXxxCommand()` pattern
@@ -193,3 +201,93 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `f
 ## Documentation Requirements
 
 When working with GitHub Copilot, execution logs are written to `docs/copilot-executions/NN-slug.md`, feature docs to `docs/features/NN-slug.md`, and bug fix docs to `docs/bug-fixes/NN-slug.md`. Each uses incrementing sequence numbers. Update relevant `.context/` files when discovering new patterns or gotchas.
+
+## Execution Logging (Mandatory)
+
+**During EVERY prompt execution — no matter how big or small — you MUST create a detailed execution log in `docs/copilot-executions/` in REAL-TIME.**
+
+This is mandatory and must never be skipped. The log documents exactly what happened during the prompt so work is traceable, reproducible, and reviewable.
+
+### File naming
+- Files are sequenced: `01-short-title.md`, `02-another-title.md`, etc.
+- Check the last sequence number in `docs/copilot-executions/` and increment by 1. If no files exist, start with `01-`.
+- The title should be a short, descriptive kebab-case summary of what the prompt asked for.
+
+### Required sections
+Every execution log must include **all** of the following sections with detailed content:
+
+```markdown
+# <NN> - <Prompt Title>
+
+**Date**: YYYY-MM-DD HH:MM UTC
+**Prompt**: <The user's original prompt, quoted verbatim or closely paraphrased>
+
+## 1. Code Reading & Analysis
+- List every file read/explored during this prompt, with why it was read
+- Note relevant line numbers, functions, classes inspected
+- Include any grep/search queries run and what they found
+
+## 2. Issues Identified
+- Describe each issue found, with exact file path and line number(s)
+- Explain why it's a problem (root cause analysis)
+- Include relevant code snippets if helpful
+
+## 3. Plan
+- What approach/strategy was decided on to address the prompt
+- Any alternatives considered and why they were rejected
+- Dependencies or ordering constraints
+
+## 4. Changes Made
+- For each file changed:
+  - File path
+  - What was changed (before → after summary)
+  - Why the change was made
+- For new files created: file path and purpose
+- Write down the exact code diff for all changes made, with line numbers and context
+- If no code changes were made, explain why
+
+## 5. Commands Run
+- Every command executed (build, test, lint, etc.)
+- The result/output of each command (pass/fail, key output lines)
+- Any retries or troubleshooting steps
+
+## 6. Result
+- Final outcome: what was achieved
+- Any remaining issues or follow-up needed
+- Verification steps taken (tests, manual checks, etc.)
+
+## 7. Files Changed Summary
+| File | Action | Description |
+|------|--------|-------------|
+| path/to/file | Modified/Created/Deleted | Brief description |
+```
+
+### Rules
+- **Never skip this step**, even for single-line changes, doc-only changes, or exploratory prompts
+- Write the log at the very end, after all work is complete
+- Be detailed and specific — vague entries like "read some files" or "fixed the bug" are not acceptable
+- Include actual file paths, line numbers, command outputs, and error messages
+- If a prompt was purely exploratory (no code changes), still document what was read and what was learned
+
+### Related documentation requirements
+- After implementing any feature or significant modification, create or update a doc in `docs/features/`. Each feature doc should be named `<NN>-<feature-name>.md` (e.g., `01-cpp-parser-support.md`). Include: overview, design, implementation details, usage, testing, and code references. Check the last sequence number and increment by 1.
+- After fixing a bug, create or update a doc in `docs/bug-fixes/`. Each bug fix doc should be named `<NN>-<bug-description>.md` (e.g., `01-neo4j-connection-pool-leak.md`). Include: problem statement, root cause analysis, solution implemented, testing verification, and code references. Check the last sequence number and increment by 1.
+
+## File Naming Conventions
+
+| Category           | Pattern                                | Example                                        |
+|--------------------|----------------------------------------|------------------------------------------------|
+| Feature docs       | `docs/features/NN-slug.md`            | `docs/features/01-cpp-parser-support.md`       |
+| Bug fix docs       | `docs/bug-fixes/NN-slug.md`           | `docs/bug-fixes/01-neo4j-connection-pool-leak.md` |
+| Copilot executions | `docs/copilot-executions/NN-slug.md`  | `docs/copilot-executions/01-add-python-parser.md` |
+
+## Continuous Learning
+
+Whenever you discover a learning — a better way to work, a faster debugging technique, a bug pattern, a gotcha, or any insight that would help future tasks — **update the relevant context files** so the knowledge is preserved:
+
+1. **Update domain contexts**: If the learning is about a specific package or module, update the relevant `.context/domains/*.md` file
+2. **Update process contexts**: If the learning changes a workflow, update the relevant `.context/processes/*.md` file
+3. **Update the floorplan**: If the learning changes routing (e.g., new domain area), update `.context/FLOORPLAN.md`
+4. **Update this file**: If the learning is a broadly applicable pattern, convention, or "thing to avoid", add it to the appropriate section here
+
+The goal: **every session should leave the context system smarter than it found it.**

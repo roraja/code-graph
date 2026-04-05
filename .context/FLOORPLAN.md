@@ -40,7 +40,7 @@ Five components: **core** (engines), **cli** (Commander.js), **server** (Express
 ```
 @codegraph/core   <- foundation (no deps on other packages)
     ^
-@codegraph/cli    <- depends on core
+@codegraph/cli    <- depends on core (19 CLI commands)
 @codegraph/server <- depends on core
 @codegraph/web    <- standalone SPA (connects to server via REST API + GraphQL at runtime)
 

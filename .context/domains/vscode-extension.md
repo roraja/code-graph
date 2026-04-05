@@ -15,9 +15,11 @@ extension.ts        <- activate/deactivate, registers all commands
     +-- logger.ts       <- OutputChannel + datewise file logging
     +-- decorations.ts  <- editor line highlights and inline annotations
     +-- providers/
-        +-- scenarios.ts    <- Scenarios tree data provider
-        +-- step-walker.ts  <- Step Walker tree data provider
-        +-- functions.ts    <- Functions tree data provider
+        +-- scenarios.ts       <- Scenarios tree data provider
+        +-- step-walker.ts     <- Step Walker tree data provider
+        +-- functions.ts       <- Functions tree data provider
+        +-- call-stack-view.ts <- Call Stack webview provider (sidebar panel)
+        +-- step-detail-view.ts <- Step Detail webview provider (sidebar panel)
 ```
 
 ## Key Files
@@ -36,6 +38,8 @@ extension.ts        <- activate/deactivate, registers all commands
 | `src/providers/scenarios.ts` | `ScenariosProvider` — tree view showing all scenarios (expandable to show steps). `ScenarioNode` with status icons, `StepPreviewNode` with action icons. Caches `ScenarioView` objects |
 | `src/providers/step-walker.ts` | `StepWalkerProvider` — tree view showing current step detail (scenario name, step header, function, action, line, source code, justification, confidence, variables, corrections). `nextStep()`, `prevStep()`, `getCurrentStep()`, `getScenarioView()`, `loadScenario()` |
 | `src/providers/functions.ts` | `FunctionsProvider` — tree view showing functions grouped by file (`FileGroupNode` → `FunctionNodeItem`). Supports search filtering via `setSearch(query)`. `getCachedFunctions()` for cached access |
+| `src/providers/call-stack-view.ts` | `CallStackViewProvider` — webview provider that renders the current step's call stack as a collapsible sidebar panel (similar to VS Code's Debug Call Stack). Each frame is clickable (navigates to file:line). Hovering shows per-frame variables with types, rationale, confidence, and alternative values. View type: `codegraph.callStack` |
+| `src/providers/step-detail-view.ts` | `StepDetailViewProvider` — webview provider that renders full step detail in a rich HTML sidebar panel. Shows AI-generated justification, imagined variable values, correction notes, and metadata in a readable format. View type: `codegraph.stepDetail` |
 | **Config** | |
 | `LICENSE` | MIT license |
 | `.vscodeignore` | Excludes source/test files from VSIX |
@@ -48,6 +52,8 @@ extension.ts        <- activate/deactivate, registers all commands
 | `codegraph.scenarios` | Scenarios | All scenarios from the graph. Expand to see steps. Right-click → Walk Scenario |
 | `codegraph.stepWalker` | Step Walker | Current step detail with prev/next navigation buttons. Auto-opens source file |
 | `codegraph.functions` | Functions | All functions grouped by file. Search button. Right-click → Show Scenarios / Discover |
+| `codegraph.callStack` | Call Stack | Current step's call stack (webview). Clickable frames navigate to source. Hover for per-frame variable details |
+| `codegraph.stepDetail` | Step Detail | Full step detail (webview). AI justification, variables, corrections in readable HTML |
 
 ## Commands
 

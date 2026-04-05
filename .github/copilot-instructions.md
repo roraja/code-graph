@@ -6,11 +6,37 @@ This file provides guidance to GitHub Copilot when working with code in this rep
 
 **CodeGraph** is a TypeScript monorepo that parses codebases into a **Neo4j graph database** — functions, calls, branches, virtual dispatch, data flow — then uses **AI agents** to discover realistic usage scenarios, trace full execution paths, and provide step-by-step walkthroughs with imagined variable values and branch justifications. Users can correct AI decisions in natural language, and corrections cascade downstream.
 
-Four packages form the system:
-- **@codegraph/core** — Parsers, Neo4j graph layer, AI agents, scenario engine, correction engine
-- **@codegraph/cli** — 18 CLI commands (Commander.js) for indexing, discovering, tracing, walking, correcting
-- **@codegraph/server** — Express + Apollo GraphQL API server
-- **@codegraph/web** — React + Vite SPA with Cytoscape.js graph visualization and Zustand state
+Four npm workspace packages plus a VS Code extension with a strict dependency flow:
+
+```
+@codegraph/core   ← foundation (no deps on other packages)
+    ↑
+@codegraph/cli    ← depends on core (Commander.js CLI, 19 commands)
+@codegraph/server ← depends on core (Express + Apollo GraphQL API)
+@codegraph/web    ← standalone SPA (React + Vite, connects to server via REST + GraphQL at runtime)
+
+codegraph-navigator ← VS Code extension (imports @codegraph/core directly)
+```
+
+### Core Engine Layers (`packages/core/src/`)
+
+Each layer depends only on layers below it:
+
+```
+config/        ← Winston logger, YAML config loader (Zod validation + ${ENV_VAR} substitution)
+    ↑
+parser/        ← ICodeParser interface, TypeScript parser (ts-morph), C++ parser (regex-based)
+    ↑
+graph/         ← GraphDriver (Neo4j), GraphSchema, CodeIndexer, QueryEngine
+    ↑
+ai/            ← AIProvider interface, OpenAI + Mock + CopilotCLI implementations, specialized agents
+    ↑
+scenario/      ← ScenarioEngine (CRUD), ScenarioTracer (step-by-step tracing)
+    ↑
+correction/    ← CorrectionEngine (natural-language → structured rules → re-trace)
+    ↑
+api.ts         ← CodeGraphClient public facade (wraps all engines for external consumers)
+```
 
 ## Navigating This Codebase
 
@@ -39,13 +65,16 @@ npm test
 # Single test file
 cd packages/core && npx vitest run src/parser/typescript.test.ts
 
+# Run a single test by name
+cd packages/core && npx vitest run -t "should extract exported function declarations"
+
 # Watch mode
 cd packages/core && npx vitest watch
 
-# Integration tests (requires Neo4j running)
+# Integration tests (requires Neo4j running on bolt://localhost:7687)
 npm run test:integration
 
-# E2E tests
+# E2E tests (requires Neo4j + built packages)
 npm run test:e2e
 
 # Lint
@@ -54,12 +83,15 @@ npm run lint
 # Mock AI mode (no API key needed)
 CODEGRAPH_AI_MOCK=true npm test
 
-# Dev mode
+# Dev mode — server and web UI
 cd packages/server && npm run dev
 cd packages/web && npm run dev
 
 # Clean build artifacts
 npm run clean
+
+# Run CLI from source
+node packages/cli/dist/index.js <command>
 ```
 
 ## Code Conventions
@@ -67,7 +99,7 @@ npm run clean
 ### TypeScript
 - Target ES2022, module system Node16 (ESNext for web package)
 - Strict mode enabled everywhere — each package extends `tsconfig.base.json`
-- Barrel exports via `src/index.ts` in each package
+- Barrel exports via `src/index.ts` in each package — all public types/classes must be re-exported
 - Tests (`*.test.ts`) excluded from compilation
 
 ### Naming
@@ -113,18 +145,27 @@ catch (error) {
 - Parser tests use in-memory ts-morph projects (no file I/O)
 - Mock factories: `createMockDriver()`, `createMockQueryEngine()` returning objects with `vi.fn()` methods
 
+| Level | Location | Command | Requires |
+|-------|----------|---------|----------|
+| Unit | `packages/core/src/**/*.test.ts` + `test/unit/` | `npm test` | Nothing |
+| Integration | `packages/core/src/**/*.integration.test.ts` | `npm run test:integration` | Neo4j |
+| E2E | `test/e2e/` | `npm run test:e2e` | Neo4j + built packages |
+
 ### Commit Messages
 Follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, etc.
 
 ## Key Patterns
 
 1. **Core layered architecture**: Parser → Graph → AI → Scenario → Correction. Each layer depends only on layers below it. See `.context/domains/core.md`.
-2. **AI provider abstraction**: `AIProvider` interface with `OpenAIProvider` (production) and `MockAIProvider` (testing with canned/pattern-based responses). Set `CODEGRAPH_AI_MOCK=true` to test without API key.
-3. **CLI command registration**: Each command exports `registerXxxCommand(program: Command): void`. Entry point registers all 18 commands. Shared context via `CLIContext` / `FullCLIContext` from `helpers.ts`.
-4. **Server context factory**: `createServerContext()` wires up all core engines. `startServer()` mounts REST (`/api/*`) + GraphQL (`/graphql`) + optional static web UI.
-5. **Scenario lifecycle**: `draft → traced → validated → corrected`. Corrections are interpreted by AI into structured rules (`variable_constraint`, `branch_override`, `dispatch_override`, etc.) with cascading re-traces.
-6. **Logging**: Winston singleton with module loggers via `createModuleLogger('moduleName')`. Structured format with timestamp, level, message, metadata.
-7. **Config loading**: `findProjectRoot()` walks up directory tree → loads `.codegraph.yaml` → Zod validation → `${ENV_VAR}` substitution.
+2. **AI provider abstraction**: `AIProvider` interface with `OpenAIProvider` (production), `CopilotCLIProvider` (GitHub Copilot), and `MockAIProvider` (testing with canned/pattern-based responses). Default provider is `copilot`. Set `CODEGRAPH_AI_MOCK=true` to test without API key. All AI-dependent code must work with both providers.
+3. **CLI command registration**: Each command exports `registerXxxCommand(program: Command): void`. Entry point registers all 19 commands. Shared context via `CLIContext` / `FullCLIContext` from `helpers.ts`. Uses chalk (colored output), ora (spinners), inquirer (prompts), cli-table3 (tables).
+4. **Server context factory**: `createServerContext()` wires up all core engines. `startServer()` mounts REST (`/api/*`) + GraphQL (`/graphql`) + optional static web UI from `packages/web/dist`.
+5. **Scenario lifecycle**: `draft → traced → validated → corrected`. Corrections are interpreted by AI into structured rules (`variable_constraint`, `branch_override`, `dispatch_override`, `scenario_note`, `function_skip`, `function_include`, `global_rule`) with cascading re-traces.
+6. **Config loading**: `findProjectRoot()` walks up directory tree → loads `.vscode/code-graph/codegraph.yaml` (primary) or `.codegraph.yaml` (legacy) → Zod validation → `${ENV_VAR}` substitution. See `.codegraph.yaml.example` for all options.
+7. **Logging**: Winston singleton with module loggers via `createModuleLogger('moduleName')`. Structured format with timestamp, level, message, metadata.
+8. **Parser contract**: `ICodeParser` has 4 methods: `parseFile()`, `parseDirectory()`, `resolveDispatch()`, `findImplementations()`. TypeScript parser uses content hashing for incremental parsing.
+9. **Mock factories for tests**: `createMockDriver()` and `createMockQueryEngine()` return objects with `vi.fn()` methods. Parser tests use in-memory ts-morph projects (no file I/O).
+10. **Public API facade**: `CodeGraphClient` in `packages/core/src/api.ts` wraps all engines behind a unified API. Used by the VS Code extension (`codegraph-navigator/src/core-bridge.ts`) and can be used by other consumers. Supports mock mode with built-in demo data.
 
 ## Things to Avoid
 
@@ -133,6 +174,18 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `f
 - Never skip Zod validation when adding config fields
 - Never create CLI commands without the `registerXxxCommand()` pattern
 - Never add exports to a package without updating the barrel `src/index.ts`
+- Use `any` only when unavoidable
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Build fails with import errors | Run `npm run build` from root — packages build in dependency order |
+| "Cannot find module @codegraph/core" | Build core first: `cd packages/core && npm run build` |
+| Integration tests fail | Check Neo4j is running: `docker ps`, verify `bolt://localhost:7687` |
+| AI tests fail with auth errors | Set `CODEGRAPH_AI_MOCK=true` or provide `CODEGRAPH_AI_API_KEY` |
+| Config not found | `findProjectRoot()` walks up from cwd looking for `.vscode/code-graph/codegraph.yaml` then `.codegraph.yaml` |
+| Web UI shows blank page | Build web: `cd packages/web && npm run build`, then `codegraph serve` |
 
 ## Execution Logging (Mandatory)
 

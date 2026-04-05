@@ -2,15 +2,15 @@
 
 ## Scope
 
-The CLI tool providing 18 commands via Commander.js. Located in `packages/cli/`.
+The CLI tool providing 19 commands via Commander.js. Located in `packages/cli/`.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/index.ts` | CLI entry point — creates Commander program, registers all 18 commands, global options (`--config`, `--verbose`). Default action launches `explore` in mock mode |
+| `src/index.ts` | CLI entry point — creates Commander program, registers all 19 commands, global options (`--config`, `--verbose`). Default action launches `explore` in mock mode |
 | `src/helpers.ts` | `CLIContext` / `FullCLIContext` interfaces and factory functions. Provides `loadCLIConfig()`, `connectDriver()`, `createProvider()`, `loadContext()`, `loadFullContext()`, error handling (`handleError()`, `gracefulExit()`), spinner helpers (`startSpinner()`, `formatDuration()`), pretty-printing (`printHeader()`, `printScenarioSummary()`, `printStepDetail()`, `printCallTree()`), and mock data generators (`getMockFunctions()`, `getMockScenarios()`, `getMockSteps()`, `getMockCallers()`, `getMockCallees()`) |
-| `src/commands/*.ts` | One file per command (18 total) |
+| `src/commands/*.ts` | One file per command (19 total) |
 
 ## Commands
 
@@ -34,6 +34,7 @@ The CLI tool providing 18 commands via Commander.js. Located in `packages/cli/`.
 | `import-scenario.ts` | `import <file>` | Import scenario from JSON |
 | `functions.ts` | `functions` | Browse/search functions |
 | `diff.ts` | `diff <id>` | Compare scenario versions |
+| `install-skills.ts` | `install-skills` | Install/update AI skills for Claude & Copilot |
 
 ## Context Interfaces
 
