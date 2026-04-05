@@ -1,0 +1,525 @@
+{
+  "_format": "codegraph-codewalk-v1",
+  "walk": {
+    "id": "outlook-drag-enter-hfdrop",
+    "name": "Outlook Drag Enter → HFDrop (Virtual Files) Flow",
+    "description": "When a user drags an email attachment from Outlook over a Chromium browser window, Windows OLE fires IDropTarget::DragEnter. This walk traces the execution from the COM entry point through the Views/Aura bridge, WebContentsViewAura, DropData preparation (including virtual file extraction for HFDrop), security filtering, and the Mojo IPC call that sends drag metadata to the Blink renderer.",
+    "scenarioId": "outlook-drag-enter-hfdrop-scenario",
+    "cells": [
+      {
+        "id": "cell-0",
+        "index": 0,
+        "type": "entry",
+        "code": {
+          "filePath": "ui/base/dragdrop/drop_target_win.cc",
+          "startLine": 40,
+          "endLine": 56,
+          "text": "HRESULT DropTargetWin::DragEnter(IDataObject* data_object,\n                                 DWORD key_state,\n                                 POINTL cursor_position,\n                                 DWORD* effect) {\n  // Tell the helper that we entered so it can update the drag image.\n  IDropTargetHelper* drop_helper = DropHelper();\n  if (drop_helper) {\n    drop_helper->DragEnter(GetHWND(), data_object,\n                           reinterpret_cast<POINT*>(&cursor_position), *effect);\n  }\n\n  current_data_object_ = data_object;\n  POINT screen_pt = { cursor_position.x, cursor_position.y };\n  *effect =\n      OnDragEnter(current_data_object_.get(), key_state, screen_pt, *effect);\n  return S_OK;\n}",
+          "highlights": [
+            { "line": 40, "type": "executed", "annotation": "COM entry: Windows OLE calls IDropTarget::DragEnter" },
+            { "line": 45, "type": "executed", "annotation": "Notify shell helper for drag-image rendering" },
+            { "line": 51, "type": "assigned", "annotation": "Cache the IDataObject (Outlook's data source)" },
+            { "line": 53, "type": "called", "annotation": "Virtual dispatch → DesktopDropTargetWin::OnDragEnter" }
+          ]
+        },
+        "narrative": "When the user drags an Outlook attachment over Chromium's HWND, Windows OLE calls the COM IDropTarget::DragEnter method. DropTargetWin implements this interface. It first notifies the shell drop-target helper (for rendering the drag image), caches Outlook's IDataObject, and then dispatches to the virtual OnDragEnter which subclasses override. The IDataObject holds all of Outlook's clipboard formats — CF_FILEDESCRIPTOR, CF_FILECONTENTS (TYMED_ISTREAM), and possibly virtual filenames for HFDrop.",
+        "state": {
+          "scopes": [
+            {
+              "name": "parameters",
+              "variables": {
+                "data_object": {
+                  "value": "<IDataObject* — Outlook's OLE data source with CF_FILEDESCRIPTOR + CF_FILECONTENTS>",
+                  "type": "IDataObject*",
+                  "changed": false,
+                  "action": "read",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.96 }
+                },
+                "key_state": {
+                  "value": "0 (no modifier keys held)",
+                  "type": "DWORD",
+                  "changed": false,
+                  "action": "read",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.95 }
+                },
+                "*effect": {
+                  "value": "DROPEFFECT_COPY | DROPEFFECT_MOVE",
+                  "type": "DWORD*",
+                  "changed": true,
+                  "action": "modified",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.93 }
+                }
+              }
+            },
+            {
+              "name": "this",
+              "variables": {
+                "current_data_object_": {
+                  "value": "<IDataObject* — cached for later DragOver/Drop calls>",
+                  "type": "Microsoft::WRL::ComPtr<IDataObject>",
+                  "changed": true,
+                  "action": "modified",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.97 }
+                }
+              }
+            }
+          ],
+          "changes": [
+            "current_data_object_: null → <IDataObject* from Outlook>",
+            "*effect: DROPEFFECT_COPY|MOVE → result of OnDragEnter()"
+          ]
+        },
+        "stackDepth": 0,
+        "callStack": [
+          { "functionName": "DropTargetWin::DragEnter", "filePath": "ui/base/dragdrop/drop_target_win.cc", "line": 40, "depth": 0, "cellId": "cell-0" }
+        ],
+        "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.96 },
+        "confidence": 0.96,
+        "status": "complete"
+      },
+      {
+        "id": "cell-1",
+        "index": 1,
+        "type": "dispatch",
+        "code": {
+          "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc",
+          "startLine": 64,
+          "endLine": 75,
+          "text": "DWORD DesktopDropTargetWin::OnDragEnter(IDataObject* data_object,\n                                        DWORD key_state,\n                                        POINT position,\n                                        DWORD effect) {\n  std::unique_ptr<OSExchangeData> data;\n  std::unique_ptr<ui::DropTargetEvent> event;\n  DragDropDelegate* delegate;\n  // Translate will call OnDragEntered.\n  Translate(data_object, key_state, position, effect, &data, &event, &delegate);\n  return ui::DragDropTypes::DragOperationToDropEffect(\n      ui::DragDropTypes::DRAG_NONE);\n}",
+          "highlights": [
+            { "line": 64, "type": "executed", "annotation": "Virtual dispatch from DropTargetWin resolves here" },
+            { "line": 72, "type": "called", "annotation": "Translate: wraps IDataObject → OSExchangeData, finds target window" }
+          ]
+        },
+        "narrative": "Virtual dispatch from DropTargetWin::OnDragEnter resolves to DesktopDropTargetWin::OnDragEnter. This is the Views-layer override that bridges Windows COM drag-and-drop into the Aura window system. It delegates all real work to Translate(), which wraps the raw IDataObject into an OSExchangeData, locates the target aura::Window via hit-testing, and calls the DragDropDelegate::OnDragEntered on it.",
+        "state": {
+          "scopes": [
+            {
+              "name": "local",
+              "variables": {
+                "data": {
+                  "value": "<nullptr — will be set by Translate()>",
+                  "type": "std::unique_ptr<OSExchangeData>",
+                  "changed": true,
+                  "action": "created",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.95 }
+                },
+                "delegate": {
+                  "value": "<nullptr — will be set by Translate()>",
+                  "type": "DragDropDelegate*",
+                  "changed": true,
+                  "action": "created",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.95 }
+                }
+              }
+            }
+          ],
+          "changes": []
+        },
+        "stackDepth": 1,
+        "parentCellId": "cell-0",
+        "callStack": [
+          { "functionName": "DropTargetWin::DragEnter", "filePath": "ui/base/dragdrop/drop_target_win.cc", "line": 53, "depth": 0, "cellId": "cell-0" },
+          { "functionName": "DesktopDropTargetWin::OnDragEnter", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 64, "depth": 1, "cellId": "cell-1" }
+        ],
+        "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.97 },
+        "confidence": 0.97,
+        "status": "complete"
+      },
+      {
+        "id": "cell-2",
+        "index": 2,
+        "type": "call",
+        "code": {
+          "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc",
+          "startLine": 133,
+          "endLine": 177,
+          "text": "void DesktopDropTargetWin::Translate(\n    IDataObject* data_object,\n    DWORD key_state,\n    POINT position,\n    DWORD effect,\n    std::unique_ptr<OSExchangeData>* data,\n    std::unique_ptr<ui::DropTargetEvent>* event,\n    DragDropDelegate** delegate) {\n  if (!root_window_) {\n    return;\n  }\n\n  gfx::Point location(position.x, position.y);\n  gfx::Point root_location = location;\n  root_window_->GetHost()->ConvertScreenInPixelsToDIP(&root_location);\n  aura::Window* target_window =\n      root_window_->GetEventHandlerForPoint(root_location);\n  const bool should_change_target_window =\n      !target_window ||\n      !target_window_observation_.IsObservingSource(target_window);\n  if (should_change_target_window) {\n    NotifyDragLeave();\n    if (target_window) {\n      target_window_observation_.Observe(target_window);\n    }\n  }\n\n  *delegate = target_window ? aura::client::GetDragDropDelegate(target_window)\n                            : nullptr;\n  if (!*delegate) {\n    return;\n  }\n\n  *data = std::make_unique<OSExchangeData>(\n      std::make_unique<OSExchangeDataProviderWin>(data_object));\n  location = root_location;\n  aura::Window::ConvertPointToTarget(root_window_, target_window, &location);\n  *event = std::make_unique<ui::DropTargetEvent>(\n      *(data->get()), gfx::PointF(location), gfx::PointF(root_location),\n      ui::DragDropTypes::DropEffectToDragOperation(effect));\n  (*event)->SetFlags(ConvertKeyStateToAuraEventFlags(key_state));\n  if (should_change_target_window) {\n    (*delegate)->OnDragEntered(*event->get());\n  }\n}",
+          "highlights": [
+            { "line": 133, "type": "executed", "annotation": "Translate: bridge from Windows COM → Aura" },
+            { "line": 148, "type": "executed", "annotation": "Hit-test: find the aura::Window under cursor" },
+            { "line": 160, "type": "executed", "annotation": "Get DragDropDelegate for the target window" },
+            { "line": 166, "type": "executed", "annotation": "Wrap IDataObject → OSExchangeData (Chromium's platform-neutral drag data)" },
+            { "line": 175, "type": "called", "annotation": "Dispatch to delegate->OnDragEntered → WebContentsViewAura" }
+          ]
+        },
+        "narrative": "Translate() does the heavy lifting of bridging Windows COM into Aura. It: (1) converts screen pixels to DIP coordinates, (2) hit-tests to find the target aura::Window, (3) gets the DragDropDelegate for that window, (4) wraps the raw IDataObject into an OSExchangeData (Chromium's platform-neutral drag data wrapper — this is what makes Outlook's IStream-based CF_FILECONTENTS accessible via GetVirtualFilenames/GetFileContents), and (5) dispatches OnDragEntered on the delegate. For a browser tab, the delegate is WebContentsViewAura.",
+        "state": {
+          "scopes": [
+            {
+              "name": "local",
+              "variables": {
+                "target_window": {
+                  "value": "<aura::Window* — the browser tab's content window>",
+                  "type": "aura::Window*",
+                  "changed": true,
+                  "action": "created",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.93 }
+                },
+                "*delegate": {
+                  "value": "<WebContentsViewAura* — implements DragDropDelegate for browser tabs>",
+                  "type": "DragDropDelegate*",
+                  "changed": true,
+                  "action": "modified",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.94 }
+                },
+                "*data": {
+                  "value": "<OSExchangeData wrapping OSExchangeDataProviderWin(IDataObject)>",
+                  "type": "std::unique_ptr<OSExchangeData>",
+                  "changed": true,
+                  "action": "modified",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.95 }
+                }
+              }
+            }
+          ],
+          "changes": [
+            "target_window: unset → <aura::Window* for browser tab>",
+            "*delegate: nullptr → <WebContentsViewAura*>",
+            "*data: nullptr → <OSExchangeData wrapping IDataObject>"
+          ]
+        },
+        "stackDepth": 2,
+        "parentCellId": "cell-1",
+        "callStack": [
+          { "functionName": "DropTargetWin::DragEnter", "filePath": "ui/base/dragdrop/drop_target_win.cc", "line": 53, "depth": 0, "cellId": "cell-0" },
+          { "functionName": "DesktopDropTargetWin::OnDragEnter", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 72, "depth": 1, "cellId": "cell-1" },
+          { "functionName": "DesktopDropTargetWin::Translate", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 133, "depth": 2, "cellId": "cell-2" }
+        ],
+        "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.94 },
+        "confidence": 0.94,
+        "status": "complete"
+      },
+      {
+        "id": "cell-3",
+        "index": 3,
+        "type": "call",
+        "code": {
+          "filePath": "content/browser/web_contents/web_contents_view_aura.cc",
+          "startLine": 1543,
+          "endLine": 1568,
+          "text": "void WebContentsViewAura::OnDragEntered(const ui::DropTargetEvent& event) {\n  if (web_contents_->ShouldIgnoreInputEvents()) {\n    return;\n  }\n\n#if BUILDFLAG(IS_WIN)\n  async_drop_navigation_observer_.reset();\n#endif\n\n  std::unique_ptr<DropData> drop_data = std::make_unique<DropData>();\n  // Calling this here as event.data might become invalid inside the callback.\n  PrepareDropData(drop_data.get(), event.data());\n\n  if (drag_dest_delegate_) {\n    drag_dest_delegate_->DragInitialize(web_contents_);\n    drag_dest_delegate_->OnReceiveDragData(event.data());\n  }\n\n  DropMetadata drop_metadata(event);\n  web_contents_->GetRenderWidgetHostAtPointAsynchronously(\n      web_contents_->GetRenderViewHost()->GetWidget()->GetView(),\n      event.location_f(),\n      base::BindOnce(&WebContentsViewAura::DragEnteredCallback,\n                     weak_ptr_factory_.GetWeakPtr(), drop_metadata,\n                     std::move(drop_data)));\n}",
+          "highlights": [
+            { "line": 1543, "type": "executed", "annotation": "WebContentsViewAura::OnDragEntered — content-layer entry" },
+            { "line": 1552, "type": "assigned", "annotation": "Allocate fresh DropData struct" },
+            { "line": 1554, "type": "called", "annotation": "PrepareDropData: extract all clipboard formats from OSExchangeData" },
+            { "line": 1562, "type": "called", "annotation": "Async hit-test: find the RenderWidgetHost under the cursor" },
+            { "line": 1565, "type": "executed", "annotation": "Callback: DragEnteredCallback will run when hit-test completes" }
+          ]
+        },
+        "narrative": "WebContentsViewAura::OnDragEntered is the content-layer entry point (called from the Aura delegate dispatch in Translate). It: (1) creates a fresh DropData, (2) calls PrepareDropData to extract all clipboard formats from the OSExchangeData — this is where virtual filenames (HFDrop) are extracted on Windows, (3) notifies the drag_dest_delegate if any (e.g., extensions), and (4) asynchronously hit-tests to find the correct RenderWidgetHost for the cursor position. The actual IPC to the renderer happens in the callback (DragEnteredCallback).",
+        "state": {
+          "scopes": [
+            {
+              "name": "local",
+              "variables": {
+                "drop_data": {
+                  "value": "<DropData — freshly allocated, will be filled by PrepareDropData>",
+                  "type": "std::unique_ptr<DropData>",
+                  "changed": true,
+                  "action": "created",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.95 }
+                }
+              }
+            }
+          ],
+          "changes": [
+            "drop_data: created → filled by PrepareDropData()"
+          ]
+        },
+        "stackDepth": 3,
+        "parentCellId": "cell-2",
+        "callStack": [
+          { "functionName": "DropTargetWin::DragEnter", "filePath": "ui/base/dragdrop/drop_target_win.cc", "line": 53, "depth": 0, "cellId": "cell-0" },
+          { "functionName": "DesktopDropTargetWin::OnDragEnter", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 72, "depth": 1, "cellId": "cell-1" },
+          { "functionName": "DesktopDropTargetWin::Translate", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 175, "depth": 2, "cellId": "cell-2" },
+          { "functionName": "WebContentsViewAura::OnDragEntered", "filePath": "content/browser/web_contents/web_contents_view_aura.cc", "line": 1543, "depth": 3, "cellId": "cell-3" }
+        ],
+        "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.95 },
+        "confidence": 0.95,
+        "status": "complete"
+      },
+      {
+        "id": "cell-4",
+        "index": 4,
+        "type": "call",
+        "code": {
+          "filePath": "content/browser/web_contents/web_contents_view_aura.cc",
+          "startLine": 713,
+          "endLine": 758,
+          "text": "void WebContentsViewAura::PrepareDropData(\n    DropData* drop_data,\n    const ui::OSExchangeData& data) const {\n#if BUILDFLAG(IS_CHROMEOS)\n  drop_data->did_originate_from_renderer = false;\n#else\n  drop_data->did_originate_from_renderer = data.IsRendererTainted();\n#endif\n  drop_data->is_from_privileged = data.IsFromPrivileged();\n\n  if (std::optional<std::u16string> string = data.GetString();\n      string.has_value() && !string->empty()) {\n    drop_data->text = std::move(*string);\n  }\n\n  drop_data->url_infos =\n      data.GetURLs(ui::FilenameToURLPolicy::DO_NOT_CONVERT_FILENAMES);\n\n  if (std::optional<ui::OSExchangeData::HtmlInfo> html = data.GetHtml();\n      html.has_value()) {\n    drop_data->html = html->html;\n    if (html->base_url.is_valid()) {\n      drop_data->html_base_url = html->base_url;\n    }\n  }\n\n  if (std::optional<std::vector<ui::FileInfo>> filenames = data.GetFilenames();\n      filenames.has_value()) {\n    drop_data->filenames = filenames.value();\n  }\n#if BUILDFLAG(IS_WIN)\n  // Get a list of virtual files for later retrieval when a drop is performed.\n  // Returns empty vector if there are any non-virtual files in the data store.\n  if (ShouldIncludeVirtualFiles(*drop_data)) {\n    if (std::optional<std::vector<ui::FileInfo>> virtual_filenames =\n            data.GetVirtualFilenames();\n        virtual_filenames.has_value()) {\n      std::ranges::move(virtual_filenames.value(),\n                        std::back_inserter(drop_data->filenames));\n    }\n  }\n#endif\n\n  if (drop_data->filenames.empty()) {\n    // Only add FileContents if Filenames is empty to avoid duplicates",
+          "highlights": [
+            { "line": 713, "type": "executed", "annotation": "PrepareDropData — extract all clipboard formats" },
+            { "line": 723, "type": "assigned", "annotation": "Check renderer taint (security: did drag start inside a renderer?)" },
+            { "line": 727, "type": "assigned", "annotation": "Extract plain text from IDataObject" },
+            { "line": 732, "type": "assigned", "annotation": "Extract URLs" },
+            { "line": 743, "type": "assigned", "annotation": "Extract real filenames (e.g., files dragged from Explorer)" },
+            { "line": 750, "type": "branched", "annotation": "HFDrop gate: ShouldIncludeVirtualFiles — only if not renderer-tainted and no URLs" },
+            { "line": 751, "type": "executed", "annotation": "GetVirtualFilenames — Outlook's CF_FILEDESCRIPTOR → virtual file list" },
+            { "line": 754, "type": "assigned", "annotation": "Append virtual filenames to drop_data->filenames" }
+          ]
+        },
+        "narrative": "PrepareDropData is where Chromium extracts every clipboard format from the OSExchangeData. For Outlook HFDrop, the critical path is the #if BUILDFLAG(IS_WIN) block at line 750: ShouldIncludeVirtualFiles() returns true when the drag did NOT originate from a renderer and has no URL data. When true, GetVirtualFilenames() reads the CF_FILEDESCRIPTOR clipboard format — this is how Outlook advertises its attachment names (e.g., 'report.pdf'). The actual file bytes aren't available yet (they're behind TYMED_ISTREAM); only the names are extracted here. The bytes will be streamed on actual drop via async retrieval.",
+        "state": {
+          "scopes": [
+            {
+              "name": "parameters",
+              "variables": {
+                "drop_data": {
+                  "value": "{ did_originate_from_renderer: false, is_from_privileged: false, text: \"\", url_infos: [], filenames: [\"attachment.pdf\", \"report.xlsx\"] (virtual) }",
+                  "type": "DropData*",
+                  "changed": true,
+                  "action": "modified",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.90 },
+                  "rationale": "Outlook drags are not renderer-tainted, have no URLs, and provide virtual filenames via CF_FILEDESCRIPTOR"
+                }
+              }
+            }
+          ],
+          "changes": [
+            "drop_data->did_originate_from_renderer: unset → false",
+            "drop_data->filenames: [] → [{\"attachment.pdf\", is_virtual}, {\"report.xlsx\", is_virtual}]"
+          ]
+        },
+        "stackDepth": 4,
+        "parentCellId": "cell-3",
+        "callStack": [
+          { "functionName": "DropTargetWin::DragEnter", "filePath": "ui/base/dragdrop/drop_target_win.cc", "line": 53, "depth": 0, "cellId": "cell-0" },
+          { "functionName": "DesktopDropTargetWin::OnDragEnter", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 72, "depth": 1, "cellId": "cell-1" },
+          { "functionName": "DesktopDropTargetWin::Translate", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 175, "depth": 2, "cellId": "cell-2" },
+          { "functionName": "WebContentsViewAura::OnDragEntered", "filePath": "content/browser/web_contents/web_contents_view_aura.cc", "line": 1554, "depth": 3, "cellId": "cell-3" },
+          { "functionName": "WebContentsViewAura::PrepareDropData", "filePath": "content/browser/web_contents/web_contents_view_aura.cc", "line": 713, "depth": 4, "cellId": "cell-4" }
+        ],
+        "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.90 },
+        "confidence": 0.90,
+        "status": "complete"
+      },
+      {
+        "id": "cell-5",
+        "index": 5,
+        "type": "call",
+        "code": {
+          "filePath": "content/browser/web_contents/web_contents_view_aura.cc",
+          "startLine": 1481,
+          "endLine": 1540,
+          "text": "void WebContentsViewAura::DragEnteredCallback(\n    DropMetadata drop_metadata,\n    std::unique_ptr<DropData> drop_data,\n    base::WeakPtr<RenderWidgetHostViewBase> target,\n    std::optional<gfx::PointF> transformed_pt) {\n  drag_in_progress_ = true;\n  dropped_in_this_web_contents_ = false;\n  if (!target) {\n    return;\n  }\n  RenderWidgetHostImpl* target_rwh =\n      RenderWidgetHostImpl::From(target->GetRenderWidgetHost());\n  if (!drag_security_info_.IsValidDragTarget(target_rwh)) {\n    return;\n  }\n\n  current_rwh_for_drag_ = target_rwh->GetWeakPtr();\n  current_rvh_for_drag_ =\n      GetRenderViewHostID(web_contents_->GetRenderViewHost());\n  current_drag_data_ = std::move(drop_data);\n  current_rwh_for_drag_->FilterDropData(current_drag_data_.get());\n\n  blink::DragOperationsMask op_mask =\n      ConvertToDragOperationsMask(drop_metadata.source_operations);\n\n  WebContentsDelegate* delegate = web_contents_->GetDelegate();\n\n  auto allow_drag = [&]() {\n    if (current_drag_data_->is_from_privileged !=\n        (delegate && delegate->IsPrivileged())) {\n      return false;\n    }\n    if (delegate && !delegate->CanDragEnter(\n                        web_contents_, *current_drag_data_.get(), op_mask)) {\n      return false;\n    }\n    return true;\n  };\n\n  if (!allow_drag()) {\n    current_drag_data_ = nullptr;\n    return;\n  }\n\n  DCHECK(transformed_pt.has_value());\n  gfx::PointF screen_pt(display::Screen::Get()->GetCursorScreenPoint());\n  current_rwh_for_drag_->DragTargetDragEnter(\n      *current_drag_data_, transformed_pt.value(), screen_pt, op_mask,\n      ui::EventFlagsToWebEventModifiers(drop_metadata.flags),\n      base::DoNothing());\n\n  if (drag_dest_delegate_) {\n    drag_dest_delegate_->OnDragEnter();\n  }",
+          "highlights": [
+            { "line": 1481, "type": "executed", "annotation": "Async callback: hit-test resolved the target RenderWidgetHost" },
+            { "line": 1486, "type": "assigned", "annotation": "Mark drag as in-progress" },
+            { "line": 1491, "type": "executed", "annotation": "Get the target RenderWidgetHostImpl" },
+            { "line": 1493, "type": "branched", "annotation": "Security: validate drag target" },
+            { "line": 1501, "type": "called", "annotation": "FilterDropData: sanitize DropData (strip filenames if renderer-tainted)" },
+            { "line": 1508, "type": "branched", "annotation": "Delegate check: allow_drag() — privilege + CanDragEnter" },
+            { "line": 1533, "type": "called", "annotation": "IPC to renderer: DragTargetDragEnter sends DropData metadata to Blink" }
+          ]
+        },
+        "narrative": "DragEnteredCallback fires after the async hit-test completes. It: (1) validates the target RenderWidgetHost for security, (2) stores the drag data and calls FilterDropData to sanitize it — for renderer-tainted drags, filenames are stripped, URLs are filtered, (3) checks the delegate's CanDragEnter to see if the drag is allowed, and (4) makes the critical Mojo IPC call: DragTargetDragEnter sends the DropData metadata to the Blink renderer process. Note: for HFDrop, the filenames list (with virtual entries) goes across to the renderer as metadata — the actual file bytes are still deferred until the user completes the drop.",
+        "state": {
+          "scopes": [
+            {
+              "name": "local",
+              "variables": {
+                "target_rwh": {
+                  "value": "<RenderWidgetHostImpl* — the renderer process host for the active tab>",
+                  "type": "RenderWidgetHostImpl*",
+                  "changed": true,
+                  "action": "created",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.93 }
+                },
+                "op_mask": {
+                  "value": "kDragOperationCopy | kDragOperationMove",
+                  "type": "blink::DragOperationsMask",
+                  "changed": true,
+                  "action": "created",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.92 }
+                }
+              }
+            },
+            {
+              "name": "this",
+              "variables": {
+                "drag_in_progress_": {
+                  "value": "true",
+                  "type": "bool",
+                  "changed": true,
+                  "action": "modified",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.98 }
+                },
+                "current_rwh_for_drag_": {
+                  "value": "<WeakPtr<RenderWidgetHostImpl>>",
+                  "type": "base::WeakPtr<RenderWidgetHostImpl>",
+                  "changed": true,
+                  "action": "modified",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.95 }
+                },
+                "current_drag_data_": {
+                  "value": "<DropData with virtual filenames, post-FilterDropData>",
+                  "type": "std::unique_ptr<DropData>",
+                  "changed": true,
+                  "action": "modified",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.93 }
+                }
+              }
+            }
+          ],
+          "changes": [
+            "drag_in_progress_: false → true",
+            "current_rwh_for_drag_: null → <target RenderWidgetHostImpl>",
+            "current_drag_data_: moved in → post-FilterDropData"
+          ]
+        },
+        "stackDepth": 3,
+        "parentCellId": "cell-3",
+        "callStack": [
+          { "functionName": "DropTargetWin::DragEnter", "filePath": "ui/base/dragdrop/drop_target_win.cc", "line": 53, "depth": 0, "cellId": "cell-0" },
+          { "functionName": "DesktopDropTargetWin::OnDragEnter", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 72, "depth": 1, "cellId": "cell-1" },
+          { "functionName": "DesktopDropTargetWin::Translate", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 175, "depth": 2, "cellId": "cell-2" },
+          { "functionName": "WebContentsViewAura::DragEnteredCallback", "filePath": "content/browser/web_contents/web_contents_view_aura.cc", "line": 1481, "depth": 3, "cellId": "cell-5" }
+        ],
+        "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.93 },
+        "confidence": 0.93,
+        "status": "complete"
+      },
+      {
+        "id": "cell-6",
+        "index": 6,
+        "type": "call",
+        "code": {
+          "filePath": "content/browser/renderer_host/render_widget_host_impl.cc",
+          "startLine": 1937,
+          "endLine": 1966,
+          "text": "void RenderWidgetHostImpl::DragTargetDragEnter(\n    const DropData& drop_data,\n    const gfx::PointF& client_pt,\n    const gfx::PointF& screen_pt,\n    DragOperationsMask operations_allowed,\n    int key_modifiers,\n    DragOperationCallback callback) {\n  DragTargetDragEnterWithMetaData(DropDataToMetaData(drop_data), client_pt,\n                                  screen_pt, operations_allowed, key_modifiers,\n                                  std::move(callback));\n}\n\nvoid RenderWidgetHostImpl::DragTargetDragEnterWithMetaData(\n    const std::vector<DropData::Metadata>& metadata,\n    const gfx::PointF& client_pt,\n    const gfx::PointF& screen_pt,\n    DragOperationsMask operations_allowed,\n    int key_modifiers,\n    DragOperationCallback callback) {\n  // TODO(crbug.com/40138933): Replace with a for_frame() check.\n  if (blink_frame_widget_) {\n    DragOperationCallback callback_wrapper =\n        base::BindOnce(&RenderWidgetHostImpl::OnUpdateDragOperation,\n                       base::Unretained(this), std::move(callback));\n    blink_frame_widget_->DragTargetDragEnter(\n        DropMetaDataToDragData(metadata),\n        ConvertWindowPointToViewport(client_pt), screen_pt, operations_allowed,\n        key_modifiers, std::move(callback_wrapper));\n  }\n}",
+          "highlights": [
+            { "line": 1937, "type": "executed", "annotation": "Browser-side IPC entry: receives DropData" },
+            { "line": 1944, "type": "called", "annotation": "Convert DropData → Metadata (strips full data, keeps types + names only)" },
+            { "line": 1961, "type": "called", "annotation": "Mojo IPC: blink_frame_widget_->DragTargetDragEnter sends to renderer" }
+          ]
+        },
+        "narrative": "RenderWidgetHostImpl::DragTargetDragEnter receives the full DropData and immediately converts it to metadata via DropDataToMetaData(). This is a security boundary: the full file bytes never cross to the renderer during drag-enter — only metadata (file names, types, sizes) is sent. The metadata is then forwarded via the blink_frame_widget_ Mojo interface to the renderer process, where Blink's DragController will create a DataTransfer object for JavaScript's dragenter event. For HFDrop, the virtual file names appear in the DataTransfer.items list, but JavaScript cannot read their content until the drop event fires.",
+        "state": {
+          "scopes": [
+            {
+              "name": "local",
+              "variables": {
+                "metadata": {
+                  "value": "[{kind: kFilename, filename: \"attachment.pdf\"}, {kind: kFilename, filename: \"report.xlsx\"}]",
+                  "type": "std::vector<DropData::Metadata>",
+                  "changed": true,
+                  "action": "created",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.88 },
+                  "rationale": "DropDataToMetaData extracts file names/types but not actual content"
+                }
+              }
+            }
+          ],
+          "changes": [
+            "DropData converted to Metadata (names only, no bytes)",
+            "Mojo IPC dispatched to renderer"
+          ]
+        },
+        "stackDepth": 4,
+        "parentCellId": "cell-5",
+        "callStack": [
+          { "functionName": "DropTargetWin::DragEnter", "filePath": "ui/base/dragdrop/drop_target_win.cc", "line": 53, "depth": 0, "cellId": "cell-0" },
+          { "functionName": "DesktopDropTargetWin::OnDragEnter", "filePath": "ui/views/widget/desktop_aura/desktop_drop_target_win.cc", "line": 72, "depth": 1, "cellId": "cell-1" },
+          { "functionName": "WebContentsViewAura::DragEnteredCallback", "filePath": "content/browser/web_contents/web_contents_view_aura.cc", "line": 1533, "depth": 2, "cellId": "cell-5" },
+          { "functionName": "RenderWidgetHostImpl::DragTargetDragEnter", "filePath": "content/browser/renderer_host/render_widget_host_impl.cc", "line": 1937, "depth": 3, "cellId": "cell-6" }
+        ],
+        "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.88 },
+        "confidence": 0.88,
+        "status": "complete"
+      },
+      {
+        "id": "cell-7",
+        "index": 7,
+        "type": "block",
+        "code": {
+          "filePath": "content/browser/renderer_host/render_widget_host_impl.cc",
+          "startLine": 2043,
+          "endLine": 2052,
+          "text": "void RenderWidgetHostImpl::FilterDropData(DropData* drop_data) {\n  drop_data->view_id = GetRoutingID();\n\n  for (auto& url_info : drop_data->url_infos) {\n    GetProcess()->FilterURL(true, &url_info.url);\n  }\n  if (drop_data->did_originate_from_renderer) {\n    drop_data->filenames.clear();\n  }\n}",
+          "highlights": [
+            { "line": 2043, "type": "executed", "annotation": "FilterDropData: security sanitization before IPC" },
+            { "line": 2044, "type": "assigned", "annotation": "Tag with the routing ID of this RenderWidgetHost" },
+            { "line": 2046, "type": "executed", "annotation": "Filter all URLs through the process security policy" },
+            { "line": 2049, "type": "branched", "annotation": "If drag came from a renderer, strip all filenames (prevent exfiltration)" }
+          ]
+        },
+        "narrative": "FilterDropData is the security sanitization step that runs before the DropData is used for the DragTargetDragEnter IPC. It: (1) tags the data with the routing ID, (2) filters all URLs through the renderer process's security policy (e.g., stripping file:// URLs that the renderer shouldn't know about), and (3) critically — if the drag originated from a renderer (a cross-site drag), it strips ALL filenames to prevent data exfiltration. For Outlook drags, did_originate_from_renderer is false (it came from a native app), so the virtual filenames survive this filter.",
+        "state": {
+          "scopes": [
+            {
+              "name": "parameters",
+              "variables": {
+                "drop_data->did_originate_from_renderer": {
+                  "value": "false (drag from Outlook, not from a web page)",
+                  "type": "bool",
+                  "changed": false,
+                  "action": "read",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.96 },
+                  "rationale": "Outlook is a native app, so IsRendererTainted() returned false in PrepareDropData"
+                },
+                "drop_data->filenames": {
+                  "value": "[{\"attachment.pdf\", is_virtual}, {\"report.xlsx\", is_virtual}] (preserved — not renderer-tainted)",
+                  "type": "std::vector<ui::FileInfo>",
+                  "changed": false,
+                  "action": "read",
+                  "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.93 }
+                }
+              }
+            }
+          ],
+          "changes": [
+            "drop_data->view_id: 0 → <routing ID>",
+            "drop_data->filenames: preserved (not renderer-tainted)"
+          ]
+        },
+        "stackDepth": 4,
+        "parentCellId": "cell-5",
+        "callStack": [
+          { "functionName": "DropTargetWin::DragEnter", "filePath": "ui/base/dragdrop/drop_target_win.cc", "line": 53, "depth": 0, "cellId": "cell-0" },
+          { "functionName": "WebContentsViewAura::DragEnteredCallback", "filePath": "content/browser/web_contents/web_contents_view_aura.cc", "line": 1501, "depth": 1, "cellId": "cell-5" },
+          { "functionName": "RenderWidgetHostImpl::FilterDropData", "filePath": "content/browser/renderer_host/render_widget_host_impl.cc", "line": 2043, "depth": 2, "cellId": "cell-7" }
+        ],
+        "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.93 },
+        "confidence": 0.93,
+        "status": "complete"
+      },
+      {
+        "id": "cell-8",
+        "index": 8,
+        "type": "note",
+        "code": {
+          "filePath": "content/browser/web_contents/web_contents_view_aura.cc",
+          "startLine": 1543,
+          "endLine": 1543,
+          "text": "// Summary: Outlook DragEnter → HFDrop flow complete.",
+          "highlights": []
+        },
+        "narrative": "Summary of the Outlook DragEnter → HFDrop flow:\n\n1. **Windows OLE** → DropTargetWin::DragEnter (COM IDropTarget, caches IDataObject)\n2. **Virtual dispatch** → DesktopDropTargetWin::OnDragEnter (Views layer)\n3. **Translate()** → Wraps IDataObject in OSExchangeData, hit-tests for target aura::Window, dispatches to DragDropDelegate\n4. **WebContentsViewAura::OnDragEntered** → Creates DropData, calls PrepareDropData\n5. **PrepareDropData** → Extracts all clipboard formats. For HFDrop: ShouldIncludeVirtualFiles() gate passes (not renderer-tainted, no URLs), GetVirtualFilenames() reads CF_FILEDESCRIPTOR from Outlook\n6. **Async hit-test** → Finds the correct RenderWidgetHost for the cursor position\n7. **DragEnteredCallback** → Validates security, calls FilterDropData (Outlook drags survive since not renderer-tainted), calls DragTargetDragEnter\n8. **RenderWidgetHostImpl::DragTargetDragEnter** → Converts DropData to metadata, sends via Mojo IPC to renderer's blink_frame_widget_\n\nKey insight: During drag-enter, only file **names** cross the process boundary — actual bytes from Outlook's TYMED_ISTREAM are deferred until the drop event, where they're asynchronously retrieved via GetVirtualFilesAsTempFiles.",
+        "stackDepth": 0,
+        "callStack": [],
+        "source": { "tool": "ai:claude", "timestamp": "2026-04-05T00:00:00Z", "confidence": 0.95 },
+        "confidence": 0.95,
+        "status": "complete"
+      }
+    ],
+    "meta": {
+      "contributors": [
+        {
+          "tool": "ai:claude",
+          "fieldsPopulated": ["code", "narrative", "state", "callStack", "highlights"],
+          "timestamp": "2026-04-05T00:00:00Z"
+        }
+      ],
+      "createdAt": "2026-04-05T00:00:00Z",
+      "updatedAt": "2026-04-05T00:00:00Z",
+      "tags": ["#drag-drop", "#outlook", "#hfdrop", "#windows", "#chromium", "#istream", "#virtual-files"],
+      "entryPoint": {
+        "filePath": "ui/base/dragdrop/drop_target_win.cc",
+        "line": 40,
+        "functionName": "DropTargetWin::DragEnter"
+      }
+    }
+  }
+}

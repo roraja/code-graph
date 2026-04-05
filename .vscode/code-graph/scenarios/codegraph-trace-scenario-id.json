@@ -1,0 +1,2207 @@
+{
+  "_format": "codegraph-scenario-v1",
+  "scenario": {
+    "id": "codegraph-trace-scenario-id",
+    "name": "CodeGraph Trace Scenario ID",
+    "description": "End-to-end execution path when a user runs 'codegraph trace <scenario-id>' from the CLI. Covers argument parsing, config loading, Neo4j connection, scenario lookup, AI-powered tracing (branch decisions, variable imagination, dispatch resolution), step saving, and summary output.",
+    "status": "traced",
+    "confidence": 0.92,
+    "entryFunction": "main",
+    "triggerCondition": "User runs 'codegraph trace <scenario-id>' from the terminal",
+    "discoveredBy": "human",
+    "version": 1,
+    "tags": ["#cli", "#tracing", "#scenario", "#core-flow"],
+    "createdAt": "2026-04-05T00:00:00Z",
+    "updatedAt": "2026-04-05T00:00:00Z"
+  },
+  "steps": [
+    {
+      "id": "codegraph-trace-scenario-id-step-1",
+      "stepNumber": 1,
+      "functionId": "packages/cli/src/index.ts:106",
+      "functionName": "main",
+      "line": 107,
+      "action": "call",
+      "sourceCode": "const program = createProgram();",
+      "justification": "Entry point of the CLI. The main() function is invoked when the user runs 'codegraph trace <scenario-id>'. It creates the Commander program with all registered commands.",
+      "confidence": 0.98,
+      "variableState": {
+        "process.argv": "[\"node\", \"codegraph\", \"trace\", \"user-login-flow\"]"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 107,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-2",
+      "stepNumber": 2,
+      "functionId": "packages/cli/src/index.ts:56",
+      "functionName": "createProgram",
+      "line": 57,
+      "action": "call",
+      "sourceCode": "const program = new Command();",
+      "justification": "createProgram() initializes a Commander program, sets global options (--config, --verbose), and registers all 19 subcommands including registerTraceCommand(program).",
+      "confidence": 0.97,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 107,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/index.ts:56",
+          "functionName": "createProgram",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 57,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-3",
+      "stepNumber": 3,
+      "functionId": "packages/cli/src/commands/trace.ts:26",
+      "functionName": "registerTraceCommand",
+      "line": 27,
+      "action": "call",
+      "sourceCode": "program.command('trace <scenario-id>').description('Trace a scenario through the codebase').option('--max-depth <n>', 'Maximum call depth', '50').action(async (scenarioId, opts, cmd) => { ... });",
+      "justification": "The trace command is registered with Commander. It defines the 'trace <scenario-id>' command with a --max-depth option (default 50). The action handler is defined but not yet invoked.",
+      "confidence": 0.97,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 107,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/index.ts:56",
+          "functionName": "createProgram",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 70,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/commands/trace.ts:26",
+          "functionName": "registerTraceCommand",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 27,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-4",
+      "stepNumber": 4,
+      "functionId": "packages/cli/src/index.ts:56",
+      "functionName": "createProgram",
+      "line": 100,
+      "action": "return",
+      "sourceCode": "return program;",
+      "justification": "createProgram completes registration of all 19 commands and returns the Commander program instance back to main().",
+      "confidence": 0.97,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 107,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/index.ts:56",
+          "functionName": "createProgram",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 100,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-5",
+      "stepNumber": 5,
+      "functionId": "packages/cli/src/index.ts:106",
+      "functionName": "main",
+      "line": 110,
+      "action": "call",
+      "sourceCode": "await program.parseAsync(process.argv);",
+      "justification": "Commander parses process.argv, identifies 'trace' as the subcommand, extracts 'user-login-flow' as the scenario-id argument, and dispatches to the trace command's action handler.",
+      "confidence": 0.96,
+      "variableState": {
+        "process.argv": "[\"node\", \"codegraph\", \"trace\", \"user-login-flow\"]"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-6",
+      "stepNumber": 6,
+      "functionId": "packages/cli/src/commands/trace.ts:31",
+      "functionName": "traceCommand.action",
+      "line": 32,
+      "action": "call",
+      "sourceCode": "const verbose = cmd.parent?.opts().verbose ?? false;\nconst configPath = cmd.parent?.opts().config;",
+      "justification": "The trace command's action handler is invoked by Commander with scenarioId='user-login-flow'. It reads the --verbose and --config parent options.",
+      "confidence": 0.95,
+      "variableState": {
+        "scenarioId": "\"user-login-flow\"",
+        "verbose": "false",
+        "configPath": "undefined"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 32,
+          "variables": {
+            "scenarioId": {
+              "value": "\"user-login-flow\"",
+              "type": "string",
+              "rationale": "The scenario ID passed as the CLI argument",
+              "alternatives": ["\"fetch-user-profile\"", "\"rate-limit-check\""],
+              "confidence": 0.98
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-7",
+      "stepNumber": 7,
+      "functionId": "packages/cli/src/helpers.ts:148",
+      "functionName": "loadFullContext",
+      "line": 149,
+      "action": "call",
+      "sourceCode": "const ctx = await loadContext(configPath);",
+      "justification": "loadFullContext is called to initialize all engines. It first delegates to loadContext to set up the base context (config + Neo4j + core engines), then creates the AI agents and wires up the ScenarioTracer and CorrectionEngine.",
+      "confidence": 0.95,
+      "variableState": {
+        "configPath": "undefined"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-8",
+      "stepNumber": 8,
+      "functionId": "packages/cli/src/helpers.ts:129",
+      "functionName": "loadContext",
+      "line": 130,
+      "action": "call",
+      "sourceCode": "const config = loadCLIConfig(configPath);",
+      "justification": "loadContext starts by loading the CLI config — this calls loadCLIConfig which in turn calls the core loadConfig function.",
+      "confidence": 0.95,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/cli/src/helpers.ts:129",
+          "functionName": "loadContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 130,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-9",
+      "stepNumber": 9,
+      "functionId": "packages/cli/src/helpers.ts:61",
+      "functionName": "loadCLIConfig",
+      "line": 63,
+      "action": "call",
+      "sourceCode": "return loadConfig(configPath);",
+      "justification": "loadCLIConfig delegates to the core loadConfig function. If config loading fails, it prints a helpful error message and exits with code 1.",
+      "confidence": 0.94,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/cli/src/helpers.ts:129",
+          "functionName": "loadContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 130,
+          "variables": {}
+        },
+        {
+          "depth": 4,
+          "functionId": "packages/cli/src/helpers.ts:61",
+          "functionName": "loadCLIConfig",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 63,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-10",
+      "stepNumber": 10,
+      "functionId": "packages/core/src/config/loader.ts:131",
+      "functionName": "loadConfig",
+      "line": 132,
+      "action": "call",
+      "sourceCode": "const root = projectRoot ?? process.cwd();",
+      "justification": "The core loadConfig function resolves the project root (defaults to cwd), checks for .vscode/code-graph/codegraph.yaml (primary) or .codegraph.yaml (legacy), reads the YAML file, substitutes environment variables (like ${CODEGRAPH_NEO4J_PASSWORD}), and validates the result with Zod.",
+      "confidence": 0.94,
+      "variableState": {
+        "root": "\"/home/user/project\"",
+        "primaryPath": "\"/home/user/project/.vscode/code-graph/codegraph.yaml\"",
+        "legacyPath": "\"/home/user/project/.codegraph.yaml\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/cli/src/helpers.ts:129",
+          "functionName": "loadContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 130,
+          "variables": {}
+        },
+        {
+          "depth": 4,
+          "functionId": "packages/cli/src/helpers.ts:61",
+          "functionName": "loadCLIConfig",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 63,
+          "variables": {}
+        },
+        {
+          "depth": 5,
+          "functionId": "packages/core/src/config/loader.ts:131",
+          "functionName": "loadConfig",
+          "filePath": "packages/core/src/config/loader.ts",
+          "line": 132,
+          "variables": {
+            "projectRoot": {
+              "value": "undefined",
+              "type": "string | undefined",
+              "rationale": "No --config flag was passed, so projectRoot is undefined and process.cwd() is used",
+              "alternatives": ["\"/custom/path\""],
+              "confidence": 0.95
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-11",
+      "stepNumber": 11,
+      "functionId": "packages/core/src/config/loader.ts:131",
+      "functionName": "loadConfig",
+      "line": 140,
+      "action": "branch_taken",
+      "sourceCode": "if (existsSync(primaryPath)) {",
+      "justification": "The primary config file .vscode/code-graph/codegraph.yaml exists in the project root, so we use it. The legacy .codegraph.yaml fallback is not needed.",
+      "confidence": 0.88,
+      "variableState": {
+        "configPath": "\"/home/user/project/.vscode/code-graph/codegraph.yaml\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/cli/src/helpers.ts:129",
+          "functionName": "loadContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 130,
+          "variables": {}
+        },
+        {
+          "depth": 4,
+          "functionId": "packages/core/src/config/loader.ts:131",
+          "functionName": "loadConfig",
+          "filePath": "packages/core/src/config/loader.ts",
+          "line": 140,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-12",
+      "stepNumber": 12,
+      "functionId": "packages/core/src/config/loader.ts:131",
+      "functionName": "loadConfig",
+      "line": 154,
+      "action": "return",
+      "sourceCode": "return CodeGraphConfigSchema.parse(substituted);",
+      "justification": "The YAML is parsed, env vars substituted (e.g., ${CODEGRAPH_NEO4J_PASSWORD}), and Zod validates the full config schema including neo4j, ai, tracing, and server sections. The validated CodeGraphConfig object is returned.",
+      "confidence": 0.93,
+      "variableState": {
+        "config.neo4j.uri": "\"bolt://localhost:7687\"",
+        "config.ai.provider": "\"copilot\"",
+        "config.tracing.maxDepth": "50"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/cli/src/helpers.ts:129",
+          "functionName": "loadContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 130,
+          "variables": {}
+        },
+        {
+          "depth": 4,
+          "functionId": "packages/core/src/config/loader.ts:131",
+          "functionName": "loadConfig",
+          "filePath": "packages/core/src/config/loader.ts",
+          "line": 154,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-13",
+      "stepNumber": 13,
+      "functionId": "packages/cli/src/helpers.ts:82",
+      "functionName": "connectDriver",
+      "line": 83,
+      "action": "call",
+      "sourceCode": "const driver = GraphDriver.create({ uri: config.neo4j.uri, username: config.neo4j.username, password: config.neo4j.password, database: config.neo4j.database });",
+      "justification": "loadContext calls connectDriver to create a GraphDriver instance from the Neo4j config and establish the connection. GraphDriver.create() is a factory method that returns an unconnected driver.",
+      "confidence": 0.94,
+      "variableState": {
+        "config.neo4j.uri": "\"bolt://localhost:7687\"",
+        "config.neo4j.username": "\"neo4j\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/cli/src/helpers.ts:129",
+          "functionName": "loadContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 131,
+          "variables": {}
+        },
+        {
+          "depth": 4,
+          "functionId": "packages/cli/src/helpers.ts:82",
+          "functionName": "connectDriver",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 83,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-14",
+      "stepNumber": 14,
+      "functionId": "packages/core/src/graph/driver.ts:91",
+      "functionName": "GraphDriver.create",
+      "line": 92,
+      "action": "call",
+      "sourceCode": "return new GraphDriver(config.uri, config.username, config.password, config.database ?? 'neo4j', config.maxConnectionPoolSize ?? 100, config.connectionAcquisitionTimeout ?? 60_000);",
+      "justification": "Static factory method creates the GraphDriver instance with connection pool settings (max 100 connections, 60s acquisition timeout).",
+      "confidence": 0.96,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:82",
+          "functionName": "connectDriver",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 83,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/graph/driver.ts:91",
+          "functionName": "GraphDriver.create",
+          "filePath": "packages/core/src/graph/driver.ts",
+          "line": 92,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-15",
+      "stepNumber": 15,
+      "functionId": "packages/core/src/graph/driver.ts:107",
+      "functionName": "GraphDriver.connect",
+      "line": 113,
+      "action": "call",
+      "sourceCode": "this.driver = neo4j.driver(this.uri, neo4j.auth.basic(this.username, this.password), { maxConnectionPoolSize: this.maxConnectionPoolSize, connectionAcquisitionTimeout: this.connectionAcquisitionTimeout });",
+      "justification": "connect() creates the underlying neo4j-driver instance with basic auth and verifies connectivity. On success, connected is set to true.",
+      "confidence": 0.93,
+      "variableState": {
+        "this.connected": "true"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:82",
+          "functionName": "connectDriver",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 89,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/graph/driver.ts:107",
+          "functionName": "GraphDriver.connect",
+          "filePath": "packages/core/src/graph/driver.ts",
+          "line": 113,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-16",
+      "stepNumber": 16,
+      "functionId": "packages/cli/src/helpers.ts:129",
+      "functionName": "loadContext",
+      "line": 132,
+      "action": "call",
+      "sourceCode": "const schema = new GraphSchema(driver);\nconst indexer = new CodeIndexer(driver);\nconst queryEngine = new QueryEngine(driver);\nconst scenarioEngine = new ScenarioEngine(driver, queryEngine);",
+      "justification": "loadContext instantiates the core engines: GraphSchema (DDL), CodeIndexer (write operations), QueryEngine (typed Cypher reads), and ScenarioEngine (scenario CRUD). All receive the connected GraphDriver via constructor injection.",
+      "confidence": 0.94,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/cli/src/helpers.ts:129",
+          "functionName": "loadContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 132,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-17",
+      "stepNumber": 17,
+      "functionId": "packages/cli/src/helpers.ts:99",
+      "functionName": "createProvider",
+      "line": 102,
+      "action": "call",
+      "sourceCode": "const factory = (agentModule as { createAIProvider?: (cfg: unknown) => AIProvider }).createAIProvider;",
+      "justification": "createProvider dynamically imports the createAIProvider factory from @codegraph/core to create the AI provider. The config specifies provider='copilot' by default, so a CopilotCLIProvider is created.",
+      "confidence": 0.90,
+      "variableState": {
+        "config.ai.provider": "\"copilot\"",
+        "config.ai.model": "\"gpt-4-turbo\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/cli/src/helpers.ts:129",
+          "functionName": "loadContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 137,
+          "variables": {}
+        },
+        {
+          "depth": 4,
+          "functionId": "packages/cli/src/helpers.ts:99",
+          "functionName": "createProvider",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 102,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-18",
+      "stepNumber": 18,
+      "functionId": "packages/core/src/ai/agent.ts:333",
+      "functionName": "createAIProvider",
+      "line": 334,
+      "action": "branch_taken",
+      "sourceCode": "case 'copilot': return new CopilotCLIProvider({ cwd: config.projectRoot });",
+      "justification": "The factory switch statement matches 'copilot' and creates a CopilotCLIProvider. If CODEGRAPH_AI_MOCK=true were set, the config.provider would be 'mock' instead, yielding a MockAIProvider.",
+      "confidence": 0.88,
+      "variableState": {
+        "config.provider": "\"copilot\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 149,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/ai/agent.ts:333",
+          "functionName": "createAIProvider",
+          "filePath": "packages/core/src/ai/agent.ts",
+          "line": 334,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-19",
+      "stepNumber": 19,
+      "functionId": "packages/cli/src/helpers.ts:148",
+      "functionName": "loadFullContext",
+      "line": 151,
+      "action": "call",
+      "sourceCode": "const parser = new TypeScriptParser();\nconst pathTracer = new PathTracerAgent(ctx.aiProvider);\nconst variableImaginer = new VariableImaginerAgent(ctx.aiProvider);\nconst justifier = new JustifierAgent(ctx.aiProvider);\nconst discoveryAgent = new ScenarioDiscoveryAgent(ctx.aiProvider);\nconst interpreter = new CorrectionInterpreterAgent(ctx.aiProvider);",
+      "justification": "loadFullContext creates all AI agents (PathTracerAgent, VariableImaginerAgent, JustifierAgent, ScenarioDiscoveryAgent, CorrectionInterpreterAgent) by injecting the AI provider into each. Also creates a TypeScriptParser for reading source code during tracing.",
+      "confidence": 0.94,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 151,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-20",
+      "stepNumber": 20,
+      "functionId": "packages/cli/src/helpers.ts:148",
+      "functionName": "loadFullContext",
+      "line": 158,
+      "action": "call",
+      "sourceCode": "const scenarioTracer = new ScenarioTracer(parser, ctx.queryEngine, pathTracer, variableImaginer, justifier);",
+      "justification": "The ScenarioTracer is created with constructor injection of all five dependencies: TypeScriptParser, QueryEngine, PathTracerAgent, VariableImaginerAgent, and JustifierAgent. This is the engine that will orchestrate the actual tracing.",
+      "confidence": 0.95,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 158,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-21",
+      "stepNumber": 21,
+      "functionId": "packages/cli/src/helpers.ts:148",
+      "functionName": "loadFullContext",
+      "line": 173,
+      "action": "return",
+      "sourceCode": "return { ...ctx, scenarioTracer, correctionEngine, discoveryAgent };",
+      "justification": "The FullCLIContext is assembled by spreading the base CLIContext and adding scenarioTracer, correctionEngine, and discoveryAgent. This full context is returned to the trace command handler.",
+      "confidence": 0.95,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 36,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:148",
+          "functionName": "loadFullContext",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 173,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-22",
+      "stepNumber": 22,
+      "functionId": "packages/core/src/scenario/engine.ts:191",
+      "functionName": "ScenarioEngine.getScenario",
+      "line": 192,
+      "action": "call",
+      "sourceCode": "const result = await this.driver.run('MATCH (s:Scenario {id: $id}) RETURN s', { id });",
+      "justification": "Back in the trace command handler, ctx.scenarioEngine.getScenario(scenarioId) is called to look up the scenario 'user-login-flow' in Neo4j. It runs a Cypher MATCH query and converts the result to a Scenario object.",
+      "confidence": 0.94,
+      "variableState": {
+        "id": "\"user-login-flow\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 39,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/engine.ts:191",
+          "functionName": "ScenarioEngine.getScenario",
+          "filePath": "packages/core/src/scenario/engine.ts",
+          "line": 192,
+          "variables": {
+            "id": {
+              "value": "\"user-login-flow\"",
+              "type": "string",
+              "rationale": "The scenario ID passed from the CLI argument",
+              "alternatives": ["\"fetch-user-profile\""],
+              "confidence": 0.98
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-23",
+      "stepNumber": 23,
+      "functionId": "packages/cli/src/commands/trace.ts:31",
+      "functionName": "traceCommand.action",
+      "line": 40,
+      "action": "branch_taken",
+      "sourceCode": "if (!scenario) { console.error(chalk.red(`Scenario not found: ${scenarioId}`)); ... }",
+      "justification": "The scenario was found in Neo4j (not null), so the '!scenario' branch is NOT taken. Execution continues to the tracing logic. If the scenario didn't exist, the CLI would print an error and exit with code 1.",
+      "confidence": 0.90,
+      "variableState": {
+        "scenario.name": "\"User Login Flow\"",
+        "scenario.entryFunction": "\"AuthService.authenticateUser\"",
+        "scenario.status": "\"draft\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 40,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-24",
+      "stepNumber": 24,
+      "functionId": "packages/cli/src/commands/trace.ts:31",
+      "functionName": "traceCommand.action",
+      "line": 46,
+      "action": "call",
+      "sourceCode": "printHeader(`Tracing: ${scenario.name}`);\nconsole.log(chalk.dim('  Description: ') + scenario.description);\nconsole.log(chalk.dim('  Entry:       ') + chalk.cyan(scenario.entryFunction));",
+      "justification": "The CLI prints a styled header showing the scenario name, description, and entry function before starting the trace. This gives the user feedback about what's being traced.",
+      "confidence": 0.96,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 46,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-25",
+      "stepNumber": 25,
+      "functionId": "packages/cli/src/commands/trace.ts:31",
+      "functionName": "traceCommand.action",
+      "line": 51,
+      "action": "call",
+      "sourceCode": "const spinner = startSpinner('Tracing execution path...');",
+      "justification": "An ora spinner is started to show progress to the user during the potentially long-running trace operation.",
+      "confidence": 0.97,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 51,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-26",
+      "stepNumber": 26,
+      "functionId": "packages/core/src/scenario/tracer.ts:107",
+      "functionName": "ScenarioTracer.trace",
+      "line": 111,
+      "action": "call",
+      "sourceCode": "const fullConfig = { ...DEFAULT_TRACE_CONFIG, ...config };",
+      "justification": "The core trace method is called with the scenario object and maxDepth from the CLI option (parsed to int, default 50). It merges the provided config with DEFAULT_TRACE_CONFIG and initializes the TraceContext with empty steps, zero depth, and empty visitedFunctions set.",
+      "confidence": 0.94,
+      "variableState": {
+        "scenario.id": "\"user-login-flow\"",
+        "scenario.entryFunction": "\"AuthService.authenticateUser\"",
+        "fullConfig.maxDepth": "50",
+        "fullConfig.maxStepsPerFunction": "200"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:107",
+          "functionName": "ScenarioTracer.trace",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 111,
+          "variables": {
+            "scenario": {
+              "value": "{ id: 'user-login-flow', name: 'User Login Flow', entryFunction: 'AuthService.authenticateUser' }",
+              "type": "Scenario",
+              "rationale": "The scenario loaded from Neo4j",
+              "alternatives": [],
+              "confidence": 0.95
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-27",
+      "stepNumber": 27,
+      "functionId": "packages/core/src/graph/queries.ts:116",
+      "functionName": "QueryEngine.getFunctionByName",
+      "line": 119,
+      "action": "call",
+      "sourceCode": "const result = await this.driver.run('MATCH (f:Function {qualifiedName: $qualifiedName}) RETURN f', { qualifiedName });",
+      "justification": "The tracer first attempts an exact match for the entry function 'AuthService.authenticateUser' by qualifiedName in Neo4j. This is the primary lookup path.",
+      "confidence": 0.94,
+      "variableState": {
+        "qualifiedName": "\"AuthService.authenticateUser\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:107",
+          "functionName": "ScenarioTracer.trace",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 133,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/graph/queries.ts:116",
+          "functionName": "QueryEngine.getFunctionByName",
+          "filePath": "packages/core/src/graph/queries.ts",
+          "line": 119,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-28",
+      "stepNumber": 28,
+      "functionId": "packages/core/src/scenario/tracer.ts:107",
+      "functionName": "ScenarioTracer.trace",
+      "line": 137,
+      "action": "branch_skipped",
+      "sourceCode": "if (!entryFunction) { ... fuzzy fallback ... }",
+      "justification": "The entry function 'AuthService.authenticateUser' was found by exact qualifiedName match in Neo4j, so the fuzzy fallback logic (splitting on '::' or '.', searching by name substring) is skipped.",
+      "confidence": 0.85,
+      "variableState": {
+        "entryFunction": "{ id: 'src/auth/login.ts:15', qualifiedName: 'AuthService.authenticateUser' }"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:107",
+          "functionName": "ScenarioTracer.trace",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 137,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-29",
+      "stepNumber": 29,
+      "functionId": "packages/core/src/scenario/tracer.ts:198",
+      "functionName": "ScenarioTracer.traceFunction",
+      "line": 203,
+      "action": "call",
+      "sourceCode": "if (ctx.depth >= ctx.config.maxDepth) { ... }",
+      "justification": "traceFunction is called with the entry function AuthService.authenticateUser. It first checks depth (0 < 50, ok), then loop detection (not visited, ok), then boring functions (not boring, ok). It adds the function to visitedFunctions, increments depth to 1, and functionsTraversed to 1.",
+      "confidence": 0.93,
+      "variableState": {
+        "ctx.depth": "1",
+        "ctx.functionsTraversed": "1",
+        "func.qualifiedName": "\"AuthService.authenticateUser\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:107",
+          "functionName": "ScenarioTracer.trace",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 174,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/scenario/tracer.ts:198",
+          "functionName": "ScenarioTracer.traceFunction",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 203,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-30",
+      "stepNumber": 30,
+      "functionId": "packages/core/src/scenario/tracer.ts:431",
+      "functionName": "ScenarioTracer.buildCallStackFrame",
+      "line": 435,
+      "action": "call",
+      "sourceCode": "const variables: Record<string, FrameVariable> = {};",
+      "justification": "buildCallStackFrame creates a new call stack frame for AuthService.authenticateUser. For each parameter (email: string, password: string), it calls the VariableImaginerAgent to imagine realistic values.",
+      "confidence": 0.93,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:198",
+          "functionName": "ScenarioTracer.traceFunction",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 225,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/scenario/tracer.ts:431",
+          "functionName": "ScenarioTracer.buildCallStackFrame",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 435,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-31",
+      "stepNumber": 31,
+      "functionId": "packages/core/src/ai/variable-imaginer.ts:89",
+      "functionName": "VariableImaginerAgent.imagine",
+      "line": 92,
+      "action": "call",
+      "sourceCode": "const messages = this.buildPrompt(input);\nconst raw = await this.chatJSON<VariableImaginationResult>(messages);",
+      "justification": "The VariableImaginerAgent is called to imagine a value for the 'email' parameter. It builds a prompt including the scenario context ('User Login Flow'), variable type (string), function name (AuthService.authenticateUser), and surrounding code. The AI returns a realistic email value.",
+      "confidence": 0.90,
+      "variableState": {
+        "input.variableName": "\"email\"",
+        "input.variableType": "\"string\"",
+        "result.value": "\"user@example.com\"",
+        "result.confidence": "0.85"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:431",
+          "functionName": "ScenarioTracer.buildCallStackFrame",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 443,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/ai/variable-imaginer.ts:89",
+          "functionName": "VariableImaginerAgent.imagine",
+          "filePath": "packages/core/src/ai/variable-imaginer.ts",
+          "line": 92,
+          "variables": {
+            "input.variableName": {
+              "value": "\"email\"",
+              "type": "string",
+              "rationale": "First parameter of authenticateUser",
+              "alternatives": [],
+              "confidence": 0.98
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-32",
+      "stepNumber": 32,
+      "functionId": "packages/core/src/ai/agent.ts:310",
+      "functionName": "AIAgent.chatJSON",
+      "line": 314,
+      "action": "call",
+      "sourceCode": "const raw = await this.chat(messages, { ...options, jsonMode: true });\nconst cleaned = raw.replace(/^```(?:json)?\\n?/m, '').replace(/\\n?```$/m, '');\nreturn JSON.parse(cleaned) as T;",
+      "justification": "The base AIAgent.chatJSON method sends the prompt to the AI provider with jsonMode=true, strips any markdown code fences from the response, and parses the JSON. This is the core AI communication path used by all agents.",
+      "confidence": 0.93,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/ai/variable-imaginer.ts:89",
+          "functionName": "VariableImaginerAgent.imagine",
+          "filePath": "packages/core/src/ai/variable-imaginer.ts",
+          "line": 93,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/ai/agent.ts:310",
+          "functionName": "AIAgent.chatJSON",
+          "filePath": "packages/core/src/ai/agent.ts",
+          "line": 314,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-33",
+      "stepNumber": 33,
+      "functionId": "packages/core/src/scenario/tracer.ts:391",
+      "functionName": "ScenarioTracer.createStep",
+      "line": 399,
+      "action": "call",
+      "sourceCode": "const stepNumber = ++ctx.stepCounter;",
+      "justification": "createStep is called to record the function entry step for AuthService.authenticateUser. It increments the step counter, snapshots the current call stack (deep copy), and creates the step object with action='call'.",
+      "confidence": 0.94,
+      "variableState": {
+        "stepNumber": "1",
+        "action": "\"call\"",
+        "func.qualifiedName": "\"AuthService.authenticateUser\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:198",
+          "functionName": "ScenarioTracer.traceFunction",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 230,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/scenario/tracer.ts:391",
+          "functionName": "ScenarioTracer.createStep",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 399,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-34",
+      "stepNumber": 34,
+      "functionId": "packages/core/src/graph/queries.ts:154",
+      "functionName": "QueryEngine.getCallees",
+      "line": 155,
+      "action": "call",
+      "sourceCode": "const result = await this.driver.run('MATCH (f:Function {id: $functionId})-[r:CALLS]->(callee:Function) RETURN callee, r.filePath AS filePath, r.line AS line, r.callExpression AS callExpression', { functionId });",
+      "justification": "In parallel with getBranches, getCallees queries Neo4j for all functions called by AuthService.authenticateUser via CALLS relationships. Returns an array of CallRelation objects (callee FunctionNode + call site info).",
+      "confidence": 0.93,
+      "variableState": {
+        "functionId": "\"src/auth/login.ts:15\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:198",
+          "functionName": "ScenarioTracer.traceFunction",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 236,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/graph/queries.ts:154",
+          "functionName": "QueryEngine.getCallees",
+          "filePath": "packages/core/src/graph/queries.ts",
+          "line": 155,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-35",
+      "stepNumber": 35,
+      "functionId": "packages/core/src/graph/queries.ts:229",
+      "functionName": "QueryEngine.getBranches",
+      "line": 230,
+      "action": "call",
+      "sourceCode": "const result = await this.driver.run('MATCH (b:Branch {functionId: $functionId}) RETURN b ORDER BY b.line', { functionId });",
+      "justification": "In parallel with getCallees, getBranches queries Neo4j for all BranchNode records belonging to AuthService.authenticateUser. These are the if/else/switch decision points in the function that require AI decisions.",
+      "confidence": 0.93,
+      "variableState": {
+        "functionId": "\"src/auth/login.ts:15\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:198",
+          "functionName": "ScenarioTracer.traceFunction",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 237,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/graph/queries.ts:229",
+          "functionName": "QueryEngine.getBranches",
+          "filePath": "packages/core/src/graph/queries.ts",
+          "line": 230,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-36",
+      "stepNumber": 36,
+      "functionId": "packages/core/src/scenario/tracer.ts:268",
+      "functionName": "ScenarioTracer.processBranch",
+      "line": 273,
+      "action": "call",
+      "sourceCode": "const traceResult = await this.pathTracer.traceStep({ functionSource: func.sourceCode, functionName: func.qualifiedName, scenario: { ... }, variableState: { ...ctx.variableState }, decisionType: 'branch', condition: branch.condition, line: branch.line });",
+      "justification": "For each branch in AuthService.authenticateUser, processBranch is called. It increments branchDecisions counter and asks the PathTracerAgent to decide 'then' or 'else' based on the scenario context, function source, and current variable state.",
+      "confidence": 0.92,
+      "variableState": {
+        "ctx.branchDecisions": "1"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:198",
+          "functionName": "ScenarioTracer.traceFunction",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 242,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/scenario/tracer.ts:268",
+          "functionName": "ScenarioTracer.processBranch",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 273,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-37",
+      "stepNumber": 37,
+      "functionId": "packages/core/src/ai/path-tracer.ts:109",
+      "functionName": "PathTracerAgent.traceStep",
+      "line": 110,
+      "action": "call",
+      "sourceCode": "const messages = this.buildPrompt(input);\nconst raw = await this.chatJSON<PathTraceResult>(messages);",
+      "justification": "PathTracerAgent.traceStep builds a prompt with the function source, scenario context, variable state, and the branch condition. It sends this to the AI provider via chatJSON and receives a decision ('then'/'else'), justification, updated variable state, and confidence score.",
+      "confidence": 0.92,
+      "variableState": {
+        "input.decisionType": "\"branch\"",
+        "result.decision": "\"then\"",
+        "result.confidence": "0.90"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:268",
+          "functionName": "ScenarioTracer.processBranch",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 276,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/ai/path-tracer.ts:109",
+          "functionName": "PathTracerAgent.traceStep",
+          "filePath": "packages/core/src/ai/path-tracer.ts",
+          "line": 110,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-38",
+      "stepNumber": 38,
+      "functionId": "packages/core/src/scenario/tracer.ts:268",
+      "functionName": "ScenarioTracer.processBranch",
+      "line": 291,
+      "action": "assign",
+      "sourceCode": "if (traceResult.updatedVariableState) { Object.assign(ctx.variableState, traceResult.updatedVariableState); }",
+      "justification": "After the AI decision, the variable state is updated with any new values from the PathTracerAgent's response. The branch decision ('then' maps to 'branch_taken', 'else' maps to 'branch_skipped') is recorded as a new step.",
+      "confidence": 0.92,
+      "variableState": {
+        "action": "\"branch_taken\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:268",
+          "functionName": "ScenarioTracer.processBranch",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 291,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-39",
+      "stepNumber": 39,
+      "functionId": "packages/core/src/scenario/tracer.ts:307",
+      "functionName": "ScenarioTracer.processCall",
+      "line": 312,
+      "action": "call",
+      "sourceCode": "const callee = callRel.function;",
+      "justification": "For each callee of AuthService.authenticateUser, processCall checks if the callee is abstract (requiring virtual dispatch resolution) or concrete (direct recursion into traceFunction). In this scenario the callees are concrete functions like UserRepository.findByEmail and AuthService.validateCredentials.",
+      "confidence": 0.91,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:198",
+          "functionName": "ScenarioTracer.traceFunction",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 251,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/scenario/tracer.ts:307",
+          "functionName": "ScenarioTracer.processCall",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 312,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-40",
+      "stepNumber": 40,
+      "functionId": "packages/core/src/scenario/tracer.ts:307",
+      "functionName": "ScenarioTracer.processCall",
+      "line": 315,
+      "action": "branch_skipped",
+      "sourceCode": "if (callee.isAbstract) { ... }",
+      "justification": "The callee is not abstract (isAbstract=false), so the virtual dispatch resolution path is skipped. Execution proceeds to the normal call path: directly recursing into traceFunction for the callee.",
+      "confidence": 0.90,
+      "variableState": {
+        "callee.isAbstract": "false"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:307",
+          "functionName": "ScenarioTracer.processCall",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 315,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-41",
+      "stepNumber": 41,
+      "functionId": "packages/core/src/scenario/tracer.ts:307",
+      "functionName": "ScenarioTracer.processCall",
+      "line": 354,
+      "action": "call",
+      "sourceCode": "await this.traceFunction(ctx, callee);",
+      "justification": "For each concrete callee, processCall recursively calls traceFunction. This recurses into the callee (e.g., AuthService.validateCredentials), which will again check depth, build a call stack frame, imagine variable values, process branches and calls, and record entry/return steps. This recursive process continues until max depth or no more callees.",
+      "confidence": 0.93,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:307",
+          "functionName": "ScenarioTracer.processCall",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 354,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-42",
+      "stepNumber": 42,
+      "functionId": "packages/core/src/scenario/tracer.ts:198",
+      "functionName": "ScenarioTracer.traceFunction",
+      "line": 255,
+      "action": "return",
+      "sourceCode": "const returnStep = this.createStep(ctx, func, func.endLine, 'return', `Returning from ${func.qualifiedName}`);",
+      "justification": "After processing all branches and callees of the entry function, a 'return' step is recorded. The call stack frame is popped and depth is decremented in the finally block. This pattern repeats for every function in the trace.",
+      "confidence": 0.94,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:198",
+          "functionName": "ScenarioTracer.traceFunction",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 255,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-43",
+      "stepNumber": 43,
+      "functionId": "packages/core/src/scenario/tracer.ts:107",
+      "functionName": "ScenarioTracer.trace",
+      "line": 185,
+      "action": "return",
+      "sourceCode": "return { scenarioId: scenario.id, steps: ctx.steps, functionsTraversed: ctx.functionsTraversed, branchDecisions: ctx.branchDecisions, dispatchesResolved: ctx.dispatchesResolved, durationMs };",
+      "justification": "After tracing completes, the trace method calculates durationMs, logs the summary, and returns a TraceResult object containing all steps, traversal metrics (functions traversed, branches decided, dispatches resolved), and the timing.",
+      "confidence": 0.95,
+      "variableState": {
+        "durationMs": "3400",
+        "ctx.steps.length": "12",
+        "ctx.functionsTraversed": "4",
+        "ctx.branchDecisions": "2",
+        "ctx.dispatchesResolved": "0"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 54,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/tracer.ts:107",
+          "functionName": "ScenarioTracer.trace",
+          "filePath": "packages/core/src/scenario/tracer.ts",
+          "line": 185,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-44",
+      "stepNumber": 44,
+      "functionId": "packages/cli/src/commands/trace.ts:31",
+      "functionName": "traceCommand.action",
+      "line": 59,
+      "action": "call",
+      "sourceCode": "spinner.succeed(`Trace complete in ${formatDuration(duration)}`);",
+      "justification": "The spinner is stopped with a success message showing the trace duration. The CLI transitions from the 'tracing' phase to the 'saving' phase.",
+      "confidence": 0.96,
+      "variableState": {
+        "duration": "3400"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 59,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-45",
+      "stepNumber": 45,
+      "functionId": "packages/core/src/scenario/engine.ts:270",
+      "functionName": "ScenarioEngine.saveSteps",
+      "line": 272,
+      "action": "call",
+      "sourceCode": "await this.driver.run('MATCH (s:Scenario {id: $scenarioId})-[r:HAS_STEP]->(step:ScenarioStep) DETACH DELETE step', { scenarioId });",
+      "justification": "saveSteps first deletes any existing steps for this scenario (supporting re-traces after corrections), then creates new ScenarioStep nodes linked to the Scenario via HAS_STEP relationships. Consecutive steps are linked via NEXT relationships. Finally, the scenario status is updated to 'traced'.",
+      "confidence": 0.93,
+      "variableState": {
+        "scenarioId": "\"user-login-flow\"",
+        "steps.length": "12"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 63,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/engine.ts:270",
+          "functionName": "ScenarioEngine.saveSteps",
+          "filePath": "packages/core/src/scenario/engine.ts",
+          "line": 272,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-46",
+      "stepNumber": 46,
+      "functionId": "packages/core/src/scenario/engine.ts:223",
+      "functionName": "ScenarioEngine.updateStatus",
+      "line": 224,
+      "action": "call",
+      "sourceCode": "await this.driver.run('MATCH (s:Scenario {id: $id}) SET s.status = $status, s.updatedAt = $updatedAt', { id, status, updatedAt: new Date().toISOString() });",
+      "justification": "At the end of saveSteps, the scenario status is updated from 'draft' to 'traced' via updateStatus. This marks the scenario as having a completed trace in the lifecycle (draft -> traced -> validated -> corrected).",
+      "confidence": 0.94,
+      "variableState": {
+        "id": "\"user-login-flow\"",
+        "status": "\"traced\""
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 63,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/core/src/scenario/engine.ts:270",
+          "functionName": "ScenarioEngine.saveSteps",
+          "filePath": "packages/core/src/scenario/engine.ts",
+          "line": 318,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/scenario/engine.ts:223",
+          "functionName": "ScenarioEngine.updateStatus",
+          "filePath": "packages/core/src/scenario/engine.ts",
+          "line": 224,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-47",
+      "stepNumber": 47,
+      "functionId": "packages/cli/src/commands/trace.ts:31",
+      "functionName": "traceCommand.action",
+      "line": 67,
+      "action": "call",
+      "sourceCode": "console.log(chalk.bold('Trace Summary'));\nconsole.log(chalk.dim('  Steps:       ') + chalk.white(String(result.steps.length)));\nconsole.log(chalk.dim('  Functions:   ') + chalk.white(String(result.functionsTraversed)));\nconsole.log(chalk.dim('  Branches:    ') + chalk.white(String(result.branchDecisions)));\nconsole.log(chalk.dim('  Dispatches:  ') + chalk.white(String(result.dispatchesResolved)));\nconsole.log(chalk.dim('  Duration:    ') + chalk.white(formatDuration(result.durationMs)));",
+      "justification": "The CLI prints the trace summary to the terminal: number of steps, functions traversed, branches decided, dispatches resolved, and total duration. This gives the user a quick overview of the trace results.",
+      "confidence": 0.96,
+      "variableState": {
+        "result.steps.length": "12",
+        "result.functionsTraversed": "4",
+        "result.branchDecisions": "2",
+        "result.dispatchesResolved": "0",
+        "result.durationMs": "3400"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 67,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-48",
+      "stepNumber": 48,
+      "functionId": "packages/cli/src/commands/trace.ts:31",
+      "functionName": "traceCommand.action",
+      "line": 87,
+      "action": "call",
+      "sourceCode": "console.log(chalk.dim('Run ') + chalk.cyan(`codegraph walk ${scenarioId}`) + chalk.dim(' to step through the trace.'));",
+      "justification": "A helpful next-step hint is printed, telling the user to run 'codegraph walk user-login-flow' to interactively step through the traced execution path.",
+      "confidence": 0.97,
+      "variableState": {},
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 87,
+          "variables": {}
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-49",
+      "stepNumber": 49,
+      "functionId": "packages/cli/src/helpers.ts:199",
+      "functionName": "gracefulExit",
+      "line": 200,
+      "action": "call",
+      "sourceCode": "await driver.disconnect();",
+      "justification": "gracefulExit disconnects the Neo4j driver (closing the connection pool) and exits the process with code 0 (success). The try-catch ensures disconnect errors don't crash the exit.",
+      "confidence": 0.96,
+      "variableState": {
+        "code": "0"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 93,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:199",
+          "functionName": "gracefulExit",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 200,
+          "variables": {
+            "code": {
+              "value": "0",
+              "type": "number",
+              "rationale": "Success exit code — trace completed without errors",
+              "alternatives": ["1"],
+              "confidence": 0.98
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "codegraph-trace-scenario-id-step-50",
+      "stepNumber": 50,
+      "functionId": "packages/core/src/graph/driver.ts:137",
+      "functionName": "GraphDriver.disconnect",
+      "line": 139,
+      "action": "call",
+      "sourceCode": "await this.driver.close();\nthis.driver = null;\nthis.connected = false;",
+      "justification": "The Neo4j driver is closed, releasing all pooled connections back to the server. The internal state is reset (driver=null, connected=false). After this, process.exit(0) is called.",
+      "confidence": 0.96,
+      "variableState": {
+        "this.connected": "false"
+      },
+      "callStack": [
+        {
+          "depth": 0,
+          "functionId": "packages/cli/src/index.ts:106",
+          "functionName": "main",
+          "filePath": "packages/cli/src/index.ts",
+          "line": 110,
+          "variables": {}
+        },
+        {
+          "depth": 1,
+          "functionId": "packages/cli/src/commands/trace.ts:31",
+          "functionName": "traceCommand.action",
+          "filePath": "packages/cli/src/commands/trace.ts",
+          "line": 93,
+          "variables": {}
+        },
+        {
+          "depth": 2,
+          "functionId": "packages/cli/src/helpers.ts:199",
+          "functionName": "gracefulExit",
+          "filePath": "packages/cli/src/helpers.ts",
+          "line": 201,
+          "variables": {}
+        },
+        {
+          "depth": 3,
+          "functionId": "packages/core/src/graph/driver.ts:137",
+          "functionName": "GraphDriver.disconnect",
+          "filePath": "packages/core/src/graph/driver.ts",
+          "line": 139,
+          "variables": {}
+        }
+      ]
+    }
+  ]
+}
