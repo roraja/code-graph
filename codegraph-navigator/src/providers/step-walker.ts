@@ -10,10 +10,10 @@
 
 import * as vscode from 'vscode';
 import { log, logEntry, logExit } from '../logger.js';
-import type { ScenarioStep, ScenarioView, CallStackFrame } from '@codegraph/core';
+import type { ScenarioStep, ScenarioView } from '@codegraph/core';
 
 /** Node types in the step walker tree */
-type WalkerNode = StepHeaderNode | PropertyNode | VariableNode | CallStackHeaderNode | CallStackFrameNode;
+type WalkerNode = StepHeaderNode | PropertyNode | VariableNode;
 
 /** The current step header */
 class StepHeaderNode extends vscode.TreeItem {
@@ -55,44 +55,6 @@ class VariableNode extends vscode.TreeItem {
     this.description = String(value);
     this.tooltip = `${name} = ${JSON.stringify(value, null, 2)}`;
     this.iconPath = new vscode.ThemeIcon('symbol-variable');
-  }
-}
-
-/** Header for the call stack section (collapsible) */
-class CallStackHeaderNode extends vscode.TreeItem {
-  public readonly frames: CallStackFrame[];
-
-  constructor(frames: CallStackFrame[]) {
-    super('Call Stack', vscode.TreeItemCollapsibleState.Expanded);
-    this.frames = frames;
-    this.description = `${frames.length} frame(s)`;
-    this.iconPath = new vscode.ThemeIcon('debug-stackframe');
-    this.contextValue = 'callStackHeader';
-  }
-}
-
-/** A single frame in the call stack (clickable to navigate) */
-class CallStackFrameNode extends vscode.TreeItem {
-  public readonly frame: CallStackFrame;
-
-  constructor(frame: CallStackFrame, isTopFrame: boolean) {
-    super(
-      frame.functionName,
-      vscode.TreeItemCollapsibleState.None
-    );
-    this.frame = frame;
-    const fileName = frame.filePath.split('/').pop() ?? frame.filePath;
-    this.description = `${fileName}:${frame.line}`;
-    this.tooltip = `${frame.functionName}\n${frame.filePath}:${frame.line}`;
-    this.iconPath = new vscode.ThemeIcon(
-      isTopFrame ? 'debug-stackframe-focused' : 'debug-stackframe'
-    );
-    this.contextValue = 'callStackFrame';
-    this.command = {
-      command: 'codegraph.openCallStackFrame',
-      title: 'Open in Editor',
-      arguments: [frame],
-    };
   }
 }
 
@@ -183,16 +145,6 @@ export class StepWalkerProvider implements vscode.TreeDataProvider<WalkerNode> {
   async getChildren(element?: WalkerNode): Promise<WalkerNode[]> {
     logEntry('StepWalkerProvider.getChildren');
 
-    // If expanding a call stack header, return the frames as children
-    if (element instanceof CallStackHeaderNode) {
-      const frames = element.frames.slice().reverse();
-      const frameNodes = frames.map((frame, idx) =>
-        new CallStackFrameNode(frame, idx === 0)
-      );
-      logExit('StepWalkerProvider.getChildren', { count: frameNodes.length, type: 'callStackFrames' });
-      return frameNodes;
-    }
-
     if (element) {
       logExit('StepWalkerProvider.getChildren', { count: 0 });
       return [];
@@ -274,11 +226,6 @@ export class StepWalkerProvider implements vscode.TreeDataProvider<WalkerNode> {
       for (const [name, value] of Object.entries(vars)) {
         nodes.push(new VariableNode(name, value));
       }
-    }
-
-    // Call Stack (collapsible, with clickable frames)
-    if (step.callStack && step.callStack.length > 0) {
-      nodes.push(new CallStackHeaderNode(step.callStack));
     }
 
     // Correction info

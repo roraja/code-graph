@@ -45,6 +45,11 @@
           "type": "webview"
         },
         {
+          "id": "codegraph.callStack",
+          "name": "Call Stack",
+          "type": "webview"
+        },
+        {
           "id": "codegraph.functions",
           "name": "Functions"
         }
