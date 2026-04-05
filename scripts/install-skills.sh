@@ -36,6 +36,8 @@ SKILL_DIRS=(
   "codegraph-scenario-tracing"
   "codegraph-code-walk"
   "codegraph-correction-interpreter"
+  "codegraph-codewalk-populate"
+  "codegraph-codewalk-enrich"
 )
 
 # ---- Helpers ----------------------------------------------------------------
