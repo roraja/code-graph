@@ -11,15 +11,18 @@ The extension is a **thin UI layer** that depends on `@codegraph/core` as a libr
 ```
 extension.ts        <- activate/deactivate, registers all commands
     |
-    +-- core-bridge.ts  <- creates CodeGraphClient from @codegraph/core, singleton pattern
-    +-- logger.ts       <- OutputChannel + datewise file logging
-    +-- decorations.ts  <- editor line highlights and inline annotations
+    +-- core-bridge.ts       <- creates CodeGraphClient from @codegraph/core, singleton pattern
+    +-- logger.ts            <- OutputChannel + datewise file logging
+    +-- decorations.ts       <- editor line highlights and inline annotations
+    +-- codewalk-decorations.ts <- editor decorations for code walk cells
+    +-- skills-installer.ts  <- install Claude/Copilot AI skills from Command Palette
     +-- providers/
-        +-- scenarios.ts       <- Scenarios tree data provider
-        +-- step-walker.ts     <- Step Walker tree data provider
-        +-- functions.ts       <- Functions tree data provider
-        +-- call-stack-view.ts <- Call Stack webview provider (sidebar panel)
-        +-- step-detail-view.ts <- Step Detail webview provider (sidebar panel)
+        +-- scenarios.ts           <- Scenarios tree data provider
+        +-- step-walker.ts         <- Step Walker tree data provider
+        +-- functions.ts           <- Functions tree data provider
+        +-- call-stack-view.ts     <- Call Stack webview provider (sidebar panel)
+        +-- step-detail-view.ts    <- Step Detail webview provider (sidebar panel)
+        +-- codewalk-cells-view.ts <- Code Walk Cells webview provider
 ```
 
 ## Key Files
@@ -40,6 +43,7 @@ extension.ts        <- activate/deactivate, registers all commands
 | `src/providers/functions.ts` | `FunctionsProvider` — tree view showing functions grouped by file (`FileGroupNode` → `FunctionNodeItem`). Supports search filtering via `setSearch(query)`. `getCachedFunctions()` for cached access |
 | `src/providers/call-stack-view.ts` | `CallStackViewProvider` — webview provider that renders the current step's call stack as a collapsible sidebar panel (similar to VS Code's Debug Call Stack). Each frame is clickable (navigates to file:line). Hovering shows per-frame variables with types, rationale, confidence, and alternative values. View type: `codegraph.callStack` |
 | `src/providers/step-detail-view.ts` | `StepDetailViewProvider` — webview provider that renders full step detail in a rich HTML sidebar panel. Shows AI-generated justification, imagined variable values, correction notes, and metadata in a readable format. View type: `codegraph.stepDetail` |
+| `src/skills-installer.ts` | Skills installer module. `registerInstallSkillsCommand()` adds a Command Palette command to install CodeGraph AI skills for Claude (to `~/.claude/skills/`) and Copilot (to `~/.github/copilot-instructions.d/`). Pure TypeScript, cross-platform. QuickPick UI with install/check options |
 | **Config** | |
 | `LICENSE` | MIT license |
 | `.vscodeignore` | Excludes source/test files from VSIX |
@@ -73,6 +77,7 @@ extension.ts        <- activate/deactivate, registers all commands
 | `codegraph.discoverFromFunction` | CodeGraph: Discover Scenarios from Function | Function context menu |
 | `codegraph.showScenariosForSymbol` | CodeGraph: Show Scenarios for This Function | Editor right-click menu (enablement: `editorHasSelection \|\| editorTextFocus`) |
 | `codegraph.discoverFromSymbol` | CodeGraph: Discover Scenarios Starting from This Function | Editor right-click menu (enablement: `editorHasSelection \|\| editorTextFocus`) |
+| `codegraph.installSkills` | CodeGraph: Install AI Skills (Claude & Copilot) | Command palette — installs CodeGraph AI skills to ~/.claude/skills/ and ~/.github/copilot-instructions.d/ |
 
 ## Settings
 

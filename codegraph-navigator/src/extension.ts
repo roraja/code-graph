@@ -27,6 +27,7 @@ import { FunctionsProvider } from './providers/functions.js';
 import { CodeWalkCellsViewProvider } from './providers/codewalk-cells-view.js';
 import { openStepInEditor } from './decorations.js';
 import { openCellInEditor } from './codewalk-decorations.js';
+import { registerInstallSkillsCommand } from './skills-installer.js';
 import type { ScenarioStep, CallRelation, CallStackFrame, CodeWalk } from '@codegraph/core';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -791,6 +792,10 @@ export function activate(context: vscode.ExtensionContext): void {
       openCellInEditor(data.cell, workspaceRoot, data.walk);
     }
   });
+
+  // --- Install Skills Command ---
+  log('debug', 'Registering command: codegraph.installSkills');
+  context.subscriptions.push(registerInstallSkillsCommand(context));
 
   // Clean up on deactivation
   context.subscriptions.push({

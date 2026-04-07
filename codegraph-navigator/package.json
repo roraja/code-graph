@@ -2,7 +2,7 @@
   "name": "codegraph-navigator",
   "displayName": "CodeGraph Navigator",
   "description": "Explore CodeGraph scenarios, walk through traced execution paths, browse code walks as notebook-style cells, and inspect functions — all from the VS Code sidebar.",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publisher": "codegraph",
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
       "activitybar": [
         {
           "id": "codegraph-navigator",
-          "title": "CodeGraph v0.5.0",
+          "title": "CodeGraph v0.6.0",
           "icon": "media/codegraph-icon.svg"
         },
         {
@@ -182,6 +182,10 @@
         "command": "codegraph.prevCell",
         "title": "CodeGraph: Previous Cell",
         "icon": "$(arrow-up)"
+      },
+      {
+        "command": "codegraph.installSkills",
+        "title": "CodeGraph: Install AI Skills (Claude & Copilot)"
       }
     ],
     "menus": {
