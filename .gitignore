@@ -36,5 +36,8 @@ logs/
 # === Neo4j local data ===
 neo4j-data/
 
+# === VS Code extension packages ===
+*.vsix
+
 # === Misc ===
 *.tgz

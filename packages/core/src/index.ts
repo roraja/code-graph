@@ -70,6 +70,8 @@ export type {
   CodeLocation,
   CellCorrection,
   CodeWalkFileData,
+  CodeWalkManifest,
+  CodeWalkCellFileData,
 } from './codewalk/types.js';
 export { CodeWalkFileReader } from './codewalk/file-reader.js';
 

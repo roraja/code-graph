@@ -12,19 +12,23 @@ Enrich existing code walk cells that are in 'skeleton' or 'partial' status by ad
 
 ## When to Use
 
-- User has an existing `.codewalk.json` with skeleton/partial cells
+- User has an existing code walk (v1 single-file `.codewalk.json` or v2 multi-file directory) with skeleton/partial cells
 - User wants to add narrative, variables, or call stacks to existing cells
 - User wants to upgrade cell status from skeleton → partial → complete
 
 ## Data Structure Reference
 
-See the `codewalk-populate` skill for the full data structure specification. This skill operates on existing cells within an already-created `.codewalk.json` file.
+See the `codewalk-populate` skill for the full data structure specification. This skill operates on existing cells within an already-created code walk (either format).
 
 ## Procedure
 
 ### Step 1: Read the Existing Code Walk
 
-Read the `.codewalk.json` file from `.vscode/code-graph/codewalks/`.
+Look for the walk in `.vscode/code-graph/codewalks/`. It may be stored as:
+- **V2 (directory):** `.vscode/code-graph/codewalks/<walk-id>/manifest.codewalk.json` + individual `<cell-id>.json` files
+- **V1 (single file):** `.vscode/code-graph/codewalks/<walk-id>.codewalk.json`
+
+For v2, read the manifest to see the cell list, then read individual cell files as needed.
 
 ### Step 2: Identify Cells to Enrich
 
@@ -116,7 +120,9 @@ Update `walk.meta.updatedAt`.
 
 ### Step 7: Save
 
-Write the updated JSON back to the same file.
+**V2 (multi-file):** Write each updated cell back to its individual `<cell-id>.json` file. Update the manifest only if metadata changed.
+
+**V1 (single-file):** Write the updated JSON back to the same `.codewalk.json` file.
 
 ## Important Notes
 

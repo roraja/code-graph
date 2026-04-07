@@ -17,13 +17,78 @@ Generate a `.codewalk.json` file with notebook-style cells that trace an executi
 - User provides a scenario or entry point and wants a step-by-step walkthrough
 - User wants to trace a code path and produce browsable cells
 
-## Output File
+## Output File — Two Formats
 
-Files are saved to `.vscode/code-graph/codewalks/<walk-id>.codewalk.json`.
+Code walks support two storage formats. **Prefer v2 (multi-file) for new walks** — it's faster for AI agents to generate (one cell at a time) and less error-prone (no giant JSON to assemble). The reader loads both formats transparently.
 
-## Data Structure Reference
+### Format V2: Multi-File (PREFERRED for new walks)
 
-The output file MUST conform to this exact structure:
+Each walk is a **directory** with a manifest and one JSON file per cell:
+
+```
+.vscode/code-graph/codewalks/<walk-id>/
+  manifest.codewalk.json    ← walk metadata + ordered cell list
+  cell-0.json               ← individual cell
+  cell-1.json               ← individual cell
+  ...
+```
+
+#### Manifest file (`manifest.codewalk.json`)
+
+```json
+{
+  "_format": "codegraph-codewalk-v2",
+  "walk": {
+    "id": "<kebab-case-id>",
+    "name": "<Human-readable name>",
+    "description": "<What this walk traces>",
+    "scenarioId": "<optional-scenario-id>",
+    "cellIds": ["cell-0", "cell-1", "cell-2"],
+    "meta": {
+      "contributors": [
+        {
+          "tool": "ai:claude",
+          "fieldsPopulated": ["code", "narrative", "state", "callStack", "highlights"],
+          "timestamp": "<ISO-8601>"
+        }
+      ],
+      "createdAt": "<ISO-8601>",
+      "updatedAt": "<ISO-8601>",
+      "tags": ["#tag1", "#tag2"],
+      "entryPoint": {
+        "filePath": "<path/to/file>",
+        "line": 42,
+        "functionName": "MyClass::myMethod"
+      }
+    }
+  }
+}
+```
+
+#### Individual cell file (`cell-0.json`, `cell-1.json`, etc.)
+
+```json
+{
+  "_format": "codegraph-cell-v1",
+  "walkId": "<walk-id>",
+  "cell": { /* WalkCell — see below */ }
+}
+```
+
+**Workflow for v2:**
+1. Create the walk directory: `.vscode/code-graph/codewalks/<walk-id>/`
+2. Write the manifest first with the ordered `cellIds` array
+3. Write each cell as `<cell-id>.json` — one file per cell
+4. Cells can be written incrementally (write cell-0, then cell-1, etc.)
+5. The reader auto-discovers extra cell files not in `cellIds` (sorted by index)
+
+### Format V1: Single File (legacy, still supported)
+
+One file containing the entire walk with all cells inline:
+
+```
+.vscode/code-graph/codewalks/<walk-id>.codewalk.json
+```
 
 ```json
 {
@@ -53,6 +118,11 @@ The output file MUST conform to this exact structure:
     }
   }
 }
+```
+
+Both formats are read transparently by the VS Code extension and the CodeGraph core library.
+
+## Data Structure Reference
 ```
 
 ### WalkCell Structure
@@ -181,9 +251,16 @@ For each cell, fill in:
 - `callStack`: Build the full call stack from parent references
 - `highlights`: Mark which lines are executed, branched, assigned, etc.
 
-### Step 5: Save the File
+### Step 5: Save the Files
 
-Write the JSON to `.vscode/code-graph/codewalks/<walk-id>.codewalk.json`.
+**V2 (preferred):** Create a directory and write files incrementally:
+1. Create directory `.vscode/code-graph/codewalks/<walk-id>/`
+2. Write `manifest.codewalk.json` with the walk metadata and `cellIds` array
+3. Write each cell as `<cell-id>.json` (e.g., `cell-0.json`, `cell-1.json`)
+   - Each cell file has `_format: "codegraph-cell-v1"`, `walkId`, and the `cell` object
+4. You can write cells one at a time — no need to assemble a giant JSON
+
+**V1 (still supported):** Write the full walk as a single `.vscode/code-graph/codewalks/<walk-id>.codewalk.json`.
 
 ## Cell Type Guidance
 

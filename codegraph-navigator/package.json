@@ -312,7 +312,8 @@
     "bundle": "node esbuild.mjs",
     "build": "npm run compile && npm run bundle",
     "watch": "node esbuild.mjs --watch",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "package": "npm run build && npx @vscode/vsce package --no-dependencies"
   },
   "dependencies": {
     "@codegraph/core": "0.1.0"

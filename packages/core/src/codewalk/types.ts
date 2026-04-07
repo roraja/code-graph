@@ -238,8 +238,47 @@ export interface CellCorrection {
 // File format — on-disk representation
 // ---------------------------------------------------------------------------
 
-/** The shape of a `.codewalk.json` file on disk. */
+/**
+ * V1: Single-file format — everything in one `.codewalk.json`.
+ * Backward compatible, still fully supported for reading and writing.
+ */
 export interface CodeWalkFileData {
   _format: 'codegraph-codewalk-v1';
   walk: CodeWalk;
+}
+
+/**
+ * V2: Multi-file format — walk manifest + individual cell files.
+ *
+ * Storage layout:
+ * ```
+ * .vscode/code-graph/codewalks/<walk-id>/
+ *   manifest.codewalk.json   ← CodeWalkManifest (walk metadata, no cells)
+ *   cell-0.json              ← individual WalkCell
+ *   cell-1.json              ← individual WalkCell
+ *   ...
+ * ```
+ *
+ * The manifest contains everything from CodeWalk except the `cells` array,
+ * which is replaced by `cellIds` — the ordered list of cell file basenames.
+ * Each cell file contains a single `CodeWalkCellFileData`.
+ */
+export interface CodeWalkManifest {
+  _format: 'codegraph-codewalk-v2';
+  walk: {
+    id: string;
+    name: string;
+    description: string;
+    scenarioId?: string;
+    /** Ordered list of cell IDs (file basenames without .json) */
+    cellIds: string[];
+    meta: WalkMeta;
+  };
+}
+
+/** The shape of a single cell file on disk (v2 multi-file format). */
+export interface CodeWalkCellFileData {
+  _format: 'codegraph-cell-v1';
+  walkId: string;
+  cell: WalkCell;
 }

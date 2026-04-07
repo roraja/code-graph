@@ -21,6 +21,8 @@ export type {
   CodeLocation,
   CellCorrection,
   CodeWalkFileData,
+  CodeWalkManifest,
+  CodeWalkCellFileData,
 } from './types.js';
 
 export { CodeWalkFileReader } from './file-reader.js';
