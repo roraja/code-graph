@@ -26,8 +26,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build all packages
-        run: npm run build
+      - name: Build core
+        run: npm run build --workspace=packages/core
+
+      - name: Build extension
+        run: npm run build --workspace=codegraph-navigator
 
       - name: Package VSIX
         working-directory: codegraph-navigator
