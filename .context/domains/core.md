@@ -19,6 +19,8 @@ ai/            ← AIProvider interface, OpenAI + Mock + CopilotCLI implementati
     ↑
 scenario/      ← ScenarioEngine (CRUD), ScenarioTracer (step-by-step tracing)
     ↑
+codewalk/      ← CodeWalkFileReader, notebook-style cell types for execution walkthroughs
+    ↑
 correction/    ← CorrectionEngine (natural-language → structured rules → re-trace)
 ```
 
@@ -53,6 +55,10 @@ correction/    ← CorrectionEngine (natural-language → structured rules → r
 | `src/scenario/file-reader.ts` | `ScenarioFileReader` — reads scenarios and steps from JSON files on disk at `.vscode/code-graph/scenarios/*.json`. Replaces Neo4j-based reads for the read path. Methods: `listScenarios(status?, tags?)`, `getScenario(id)`, `getSteps(scenarioId, from?, to?)`, `getStep(scenarioId, stepNumber)`, `getScenariosForFunction(functionName)`, `getScenariosDir()`. Constructor takes `(projectRoot)` |
 | **Correction Layer** | |
 | `src/correction/engine.ts` | `CorrectionEngine` — `submitCorrection(message, context, userId)`, `getCorrections()`, `undoCorrection()`. Interprets corrections via AI, persists to Neo4j, applies effects (variable_constraint, branch_override, dispatch_override, scenario_note, function_skip, function_include, global_rule), triggers cascading re-traces. Types: `CorrectionType`, `CorrectionScope` (`global` / `scenario` / `function` / `step`), `StructuredCorrection`, `Correction`, `CorrectionContext`, `CorrectionResult` |
+| **Code Walk Layer** | |
+| `src/codewalk/types.ts` | Type definitions for notebook-style code walks. Types: `CodeWalk`, `WalkCell`, `WalkMeta`, `WalkContributor`, `CellType`, `CellStatus`, `CodeSlice`, `LineHighlight`, `CellState`, `CellScope`, `CellVariable`, `CellCallStackFrame`, `DataSource`, `CodeLocation`, `CellCorrection`, `PodcastSegment`, `CodeWalkFileData`, `CodeWalkManifest`, `CodeWalkCellFileData` |
+| `src/codewalk/file-reader.ts` | `CodeWalkFileReader` — reads code walk data from JSON files on disk. Supports both v1 single-file (`.codewalk.json`) and v2 multi-file directory formats (with `manifest.codewalk.json`) |
+| `src/codewalk/index.ts` | Barrel exports for the codewalk module |
 | **Config** | |
 | `src/config/loader.ts` | `loadConfig(projectRoot?)` — loads from `.vscode/code-graph/codegraph.yaml` (primary) or `.codegraph.yaml` (legacy). Zod validation + `${ENV_VAR}` substitution. `findProjectRoot()`, `getCodeGraphDir()`, `createDefaultConfig()`, `serializeConfig()`. `CodeGraphConfig` type |
 | `src/config/logger.ts` | Winston logger singleton (`logger`) + `createModuleLogger(moduleName)` child logger factory |

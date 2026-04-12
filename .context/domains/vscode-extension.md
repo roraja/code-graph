@@ -29,7 +29,7 @@ extension.ts        <- activate/deactivate, registers all commands
 
 | File | Purpose |
 |------|---------|
-| `package.json` | Extension manifest — views, commands, menus, configuration, activation events. Version 0.4.0 |
+| `package.json` | Extension manifest — views, commands, menus, configuration, activation events. Version 0.6.0 |
 | `tsconfig.json` | TypeScript config (ES2022, Node16, separate from monorepo `tsconfig.base.json`) |
 | `esbuild.mjs` | esbuild bundler config for packaging the extension |
 | `media/codegraph-icon.svg` | Activity bar icon |
@@ -92,7 +92,7 @@ cd codegraph-navigator
 npm install
 npm run build                          # tsc compile + esbuild bundle
 npx @vscode/vsce package --no-dependencies  # create .vsix
-code --install-extension codegraph-navigator-0.4.0.vsix
+code --install-extension codegraph-navigator-0.6.0.vsix
 ```
 
 VS Code tasks in `.vscode/tasks.json` wrap these commands:

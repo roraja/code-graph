@@ -2,7 +2,7 @@
 
 **CodeGraph** parses codebases into a Neo4j graph, then uses AI agents to discover usage scenarios, trace execution paths, and support human corrections — surfaced via CLI, GraphQL/REST API, React web UI, and VS Code extension.
 
-Five components: **core** (engines), **cli** (Commander.js), **server** (Express + Apollo), **web** (React + Vite), **codegraph-navigator** (VS Code extension).
+Five components: **core** (engines), **cli** (Commander.js), **server** (Express + Apollo), **web** (React + Vite), **codegraph-navigator** (VS Code extension). Plus **skills/** (Claude/Copilot AI skill definitions), **tools/** (standalone utilities), and **scripts/** (shell helpers).
 
 ## How to Navigate
 
@@ -18,6 +18,7 @@ Five components: **core** (engines), **cli** (Commander.js), **server** (Express
 | Parsers (TypeScript, C++), AST extraction | `domains/core.md` | `packages/core/src/parser/` |
 | Neo4j graph layer, indexing, queries | `domains/core.md` | `packages/core/src/graph/` |
 | AI agents, scenario discovery, tracing | `domains/core.md` | `packages/core/src/ai/`, `packages/core/src/scenario/` |
+| Code Walk cells, notebook-style walkthroughs | `domains/core.md` | `packages/core/src/codewalk/` |
 | Corrections, re-tracing logic | `domains/core.md` | `packages/core/src/correction/` |
 | Config loading, Zod validation, logging | `domains/core.md` | `packages/core/src/config/` |
 | CLI commands, interactive REPL, prompts | `domains/cli.md` | `packages/cli/src/commands/` |
@@ -47,6 +48,22 @@ Five components: **core** (engines), **cli** (Commander.js), **server** (Express
 codegraph-navigator <- standalone VS Code extension (imports @codegraph/core directly, no CLI subprocess dependency)
 ```
 
+## Top-Level Structure
+
+```
+.context/              <- navigation context (this file, domains/, processes/)
+codegraph-navigator/   <- VS Code extension (v0.6.0)
+docs/                  <- documentation (features/, bug-fixes/, copilot-executions/, learn/, next/)
+logs/                  <- runtime logs (foreman, CLI runs)
+packages/              <- npm workspace packages (core, cli, server, web)
+scenarios/             <- pre-built scenario JSON files
+scripts/               <- shell helper scripts (cgrun, install-skills.sh)
+skills/                <- Claude/Copilot AI skill definitions (9 skills)
+test/                  <- integration/E2E tests, fixtures
+tools/                 <- standalone tools (codewalk-podcast-gen.js, codewalk-video.js, codewalk-viewer.html)
+foreman.yaml           <- Foreman process manager config (markdown viewer)
+```
+
 ## Configuration Location
 
 Config lives at `.vscode/code-graph/codegraph.yaml` (primary) with fallback to legacy `.codegraph.yaml`. The `findProjectRoot()` function walks up the directory tree checking both locations.
@@ -69,6 +86,32 @@ The workspace has VS Code-specific files in `.vscode/`:
 | Feature docs | `docs/features/NN-slug.md` | `docs/features/01-cpp-parser-support.md` |
 | Bug fix docs | `docs/bug-fixes/NN-slug.md` | `docs/bug-fixes/01-neo4j-connection-pool-leak.md` |
 | Copilot executions | `docs/copilot-executions/NN-slug.md` | `docs/copilot-executions/01-add-python-parser.md` |
+
+## Skills
+
+Nine AI skill definitions live in `skills/`, each with a `SKILL.md`:
+
+| Skill | Description |
+|-------|-------------|
+| `codegraph-code-walk` | Interactive step-by-step walkthroughs of traced scenarios |
+| `codegraph-codewalk-enrich` | Enrich existing code walk cells with variables, call stacks, explanations |
+| `codegraph-codewalk-podcast` | Generate 2-person conversational MP3 podcasts from code walks |
+| `codegraph-codewalk-populate` | Create new `.codewalk.json` files with notebook-style cells |
+| `codegraph-codewalk-video` | Generate MP4 video walkthroughs from code walks |
+| `codegraph-correction-interpreter` | Interpret natural-language corrections into structured rules |
+| `codegraph-expand-scenario` | Extend scenario traces upstream/downstream |
+| `codegraph-scenario-discovery` | Discover realistic user-facing scenarios from parsed codebases |
+| `codegraph-scenario-tracing` | Trace scenario execution paths step-by-step |
+
+## Standalone Tools
+
+| File | Purpose |
+|------|---------|
+| `tools/codewalk-viewer.html` | Standalone HTML viewer for `.codewalk.json` files |
+| `tools/codewalk-podcast-gen.js` | Generate MP3 podcasts from code walks using TTS |
+| `tools/codewalk-video.js` | Generate MP4 video walkthroughs from code walks |
+| `scripts/cgrun` | Helper script for running CodeGraph CLI |
+| `scripts/install-skills.sh` | Shell script to install AI skills for Claude & Copilot |
 
 ## Global Guardrails
 

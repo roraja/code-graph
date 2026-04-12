@@ -95,6 +95,7 @@ const mockQuery = createMockQueryEngine();   // vi.fn() for all QueryEngine meth
 ## Fixtures
 
 - `test/fixtures/sample-project/` — Sample TypeScript project (7 files: `index.ts`, `types.ts`, `events.ts`, `pipeline.ts`, `processors.ts`, `validators.ts`, `tsconfig.json`) for demos and testing
+- `test/fixtures/sample-cpp-project/` — Sample C++ project fixture for testing the C++ parser
 - `test/fixtures/ai-responses/` — Reserved directory for AI response fixtures (currently empty)
 - `scenarios/async-clipboard-read-text.json` — Pre-built 15-step Chromium clipboard scenario
 - `test/integration/` — Reserved directory for integration tests (currently empty; integration tests use `packages/core/src/**/*.integration.test.ts` pattern)

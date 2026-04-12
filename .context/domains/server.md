@@ -15,12 +15,14 @@ Express + Apollo GraphQL API server. Located in `packages/server/`.
 | `src/graphql/resolvers/mutations.ts` | Mutation resolver implementations |
 | `src/graphql/resolvers/index.ts` | Resolver barrel exports |
 | `src/rest/routes.ts` | `createRestRouter(ctx)` — Express router with REST endpoints under `/api/*` |
+| `src/rest/codewalk-viewer.ts` | Codewalk viewer — serves a standalone HTML viewer for `.codewalk.json` files via REST endpoints. Renders code walk cells with syntax highlighting in the browser |
 
 ## Architecture
 
 ```
 Express app
 ├── REST routes (/api/*)         → src/rest/routes.ts
+├── Codewalk viewer (/codewalk)  → src/rest/codewalk-viewer.ts
 ├── Apollo GraphQL (/graphql)    → src/graphql/
 └── Static web UI (optional)     → packages/web/dist/ (if built)
 ```
