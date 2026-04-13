@@ -21,6 +21,8 @@ export type {
   CodeLocation,
   CellCorrection,
   PodcastSegment,
+  CellStep,
+  BranchOption,
   CodeWalkFileData,
   CodeWalkManifest,
   CodeWalkCellFileData,

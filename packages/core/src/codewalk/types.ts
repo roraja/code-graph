@@ -102,6 +102,25 @@ export interface WalkCell {
    * gets a lighter background.
    */
   steps?: CellStep[];
+
+  /**
+   * IDs of cells that can follow this one. Enables tree-structured walks:
+   * - Omitted or empty: the next cell is determined by linear order (index + 1)
+   * - Single entry: deterministic next cell (explicit link)
+   * - Multiple entries: a **branch point** — the viewer asks the user to choose
+   *
+   * Each entry corresponds to a `BranchOption` in `branchOptions` (same order).
+   * If `branchOptions` is absent, the viewer shows cell IDs as labels.
+   */
+  nextCellIds?: string[];
+
+  /**
+   * Describes each branch option when `nextCellIds` has multiple entries.
+   * The array order matches `nextCellIds`. Each option provides a human-readable
+   * label, a short description, and optional context (condition, variable values)
+   * so the user can decide which execution path to explore.
+   */
+  branchOptions?: BranchOption[];
 }
 
 /** A sub-step within a cell — focuses on a single line/concept. */
@@ -112,6 +131,22 @@ export interface CellStep {
   focusLine: number;
   /** Optional end line for a multi-line focus range (1-based, inclusive) */
   focusEndLine?: number;
+}
+
+/**
+ * A branch option describing one possible execution path from a branch cell.
+ * Used when a cell's `nextCellIds` has multiple entries — each option gives
+ * the user enough context to decide which path to explore.
+ */
+export interface BranchOption {
+  /** Short label for the option (shown as button/menu text), e.g. "true — supported type" */
+  label: string;
+  /** Longer description of what happens on this path */
+  description: string;
+  /** The condition expression or value that leads to this path (e.g. "mimeType === 'image/jpeg'") */
+  condition?: string;
+  /** Visual indicator: 'taken' (this is the expected/common path), 'skipped', or 'error' */
+  pathHint?: 'taken' | 'skipped' | 'error' | 'default';
 }
 
 /** A single dialogue segment in a podcast-style narration. */

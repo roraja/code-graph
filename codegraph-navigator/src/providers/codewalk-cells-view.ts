@@ -8,15 +8,17 @@
  * - Variable state (changed, created, read)
  * - Call stack at that point
  *
- * Navigation is cell-wise: ▲/▼ moves between cells, and the editor
- * opens the corresponding file with the cell's lines highlighted.
+ * Navigation supports branching: when a cell has multiple `nextCellIds`,
+ * the viewer presents the user with a choice of which path to explore.
+ * A navigation history stack enables correct "Prev" behavior regardless
+ * of which branches were taken.
  *
  * @module providers/codewalk-cells-view
  */
 
 import * as vscode from 'vscode';
 import { log, logEntry, logExit } from '../logger.js';
-import type { CodeWalk, WalkCell, CellStep } from '@codegraph/core';
+import type { CodeWalk, WalkCell, CellStep, BranchOption } from '@codegraph/core';
 
 /**
  * Webview provider for the Code Walk Cells panel.
@@ -28,6 +30,17 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
   private currentWalk?: CodeWalk;
   private currentCellIndex = 0;
   private currentStepIndex = -1; // -1 = no steps / show all
+
+  /**
+   * Navigation history — a stack of cell indices the user has visited.
+   * When the user navigates forward (including choosing a branch), the
+   * current index is pushed. "Prev" pops from this stack, so it always
+   * retraces the exact path the user took, regardless of branching.
+   */
+  private navigationHistory: number[] = [];
+
+  /** Map from cell ID → index in walk.cells for O(1) lookup */
+  private cellIdToIndex = new Map<string, number>();
 
   /** Event fired when the current cell changes (for syncing editor highlights). */
   private _onCellChanged = new vscode.EventEmitter<{ walk: CodeWalk; cell: WalkCell; index: number; stepIndex: number; step?: CellStep } | undefined>();
@@ -64,6 +77,9 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
           break;
         case 'goToStep':
           this.goToStepIndex(message.stepIndex);
+          break;
+        case 'selectBranch':
+          this.selectBranch(message.branchIndex);
           break;
         case 'openFrame': {
           const filePath = message.filePath as string;
@@ -102,8 +118,10 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
     logEntry('CodeWalkCellsViewProvider.loadWalk', { walkId: walk.id, cellCount: walk.cells.length });
     this.currentWalk = walk;
     this.currentCellIndex = 0;
+    this.navigationHistory = [];
     const firstCell = walk.cells[0];
     this.currentStepIndex = (firstCell?.steps && firstCell.steps.length > 0) ? 0 : -1;
+    this.rebuildCellIdMap();
     this.render();
     this.fireCellChanged();
     logExit('CodeWalkCellsViewProvider.loadWalk');
@@ -133,6 +151,11 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
 
   /**
    * Navigate to the next cell (or next sub-step within the current cell).
+   *
+   * If the current cell has multiple `nextCellIds` (a branch point), this
+   * triggers the branch selection UI instead of advancing automatically.
+   * If it has exactly one `nextCellId`, it follows that link.
+   * If it has no `nextCellIds`, it falls through to the next cell by index.
    */
   nextCell(): void {
     if (!this.currentWalk) return;
@@ -144,12 +167,30 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
       this.fireCellChanged();
       return;
     }
+
+    // Check for branching via nextCellIds
+    if (cell?.nextCellIds && cell.nextCellIds.length > 1) {
+      // Multiple next cells — show branch selection UI (already rendered, but
+      // if user pressed "Next" button we show an info message directing them to choose)
+      vscode.window.showInformationMessage(
+        'CodeGraph: This is a branch point. Choose a path from the options below.'
+      );
+      return;
+    }
+
+    // Single explicit next cell
+    if (cell?.nextCellIds && cell.nextCellIds.length === 1) {
+      const nextId = cell.nextCellIds[0];
+      const nextIdx = this.cellIdToIndex.get(nextId);
+      if (nextIdx !== undefined) {
+        this.navigateForward(nextIdx);
+        return;
+      }
+    }
+
+    // Default: linear navigation
     if (this.currentCellIndex < this.currentWalk.cells.length - 1) {
-      this.currentCellIndex++;
-      const nextCell = this.currentWalk.cells[this.currentCellIndex];
-      this.currentStepIndex = (nextCell?.steps && nextCell.steps.length > 0) ? 0 : -1;
-      this.render();
-      this.fireCellChanged();
+      this.navigateForward(this.currentCellIndex + 1);
     } else {
       vscode.window.showInformationMessage('CodeGraph: Already at the last cell.');
     }
@@ -157,6 +198,7 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
 
   /**
    * Navigate to the previous cell (or previous sub-step within the current cell).
+   * Uses the navigation history stack to retrace the user's exact path.
    */
   prevCell(): void {
     if (!this.currentWalk) return;
@@ -168,14 +210,40 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
       this.fireCellChanged();
       return;
     }
-    if (this.currentCellIndex > 0) {
-      this.currentCellIndex--;
+
+    // Use navigation history to go back
+    if (this.navigationHistory.length > 0) {
+      const prevIdx = this.navigationHistory.pop()!;
+      this.currentCellIndex = prevIdx;
       const prevCell = this.currentWalk.cells[this.currentCellIndex];
       this.currentStepIndex = (prevCell?.steps && prevCell.steps.length > 0) ? 0 : -1;
       this.render();
       this.fireCellChanged();
     } else {
       vscode.window.showInformationMessage('CodeGraph: Already at the first cell.');
+    }
+  }
+
+  /**
+   * Select a branch when the current cell has multiple nextCellIds.
+   */
+  selectBranch(branchIndex: number): void {
+    if (!this.currentWalk) return;
+    const cell = this.currentWalk.cells[this.currentCellIndex];
+    if (!cell?.nextCellIds || branchIndex < 0 || branchIndex >= cell.nextCellIds.length) return;
+
+    const targetId = cell.nextCellIds[branchIndex];
+    const targetIdx = this.cellIdToIndex.get(targetId);
+    if (targetIdx !== undefined) {
+      log('debug', 'CodeWalkCellsViewProvider: selectBranch', {
+        branchIndex,
+        targetId,
+        targetIdx,
+        label: cell.branchOptions?.[branchIndex]?.label ?? targetId,
+      });
+      this.navigateForward(targetIdx);
+    } else {
+      vscode.window.showWarningMessage(`CodeGraph: Branch target cell "${targetId}" not found.`);
     }
   }
 
@@ -219,11 +287,13 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Jump to a specific cell by index.
+   * Jump to a specific cell by index (resets navigation history from this point).
    */
   goToCell(index: number): void {
     if (!this.currentWalk) return;
     if (index >= 0 && index < this.currentWalk.cells.length) {
+      // Push current position to history so user can go back
+      this.navigationHistory.push(this.currentCellIndex);
       this.currentCellIndex = index;
       const cell = this.currentWalk.cells[index];
       this.currentStepIndex = (cell?.steps && cell.steps.length > 0) ? 0 : -1;
@@ -239,8 +309,33 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
     this.currentWalk = undefined;
     this.currentCellIndex = 0;
     this.currentStepIndex = -1;
+    this.navigationHistory = [];
+    this.cellIdToIndex.clear();
     this.render();
     this._onCellChanged.fire(undefined);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private: navigation helpers
+  // ---------------------------------------------------------------------------
+
+  /** Push current position to history and navigate to a new cell index. */
+  private navigateForward(targetIndex: number): void {
+    this.navigationHistory.push(this.currentCellIndex);
+    this.currentCellIndex = targetIndex;
+    const cell = this.currentWalk!.cells[this.currentCellIndex];
+    this.currentStepIndex = (cell?.steps && cell.steps.length > 0) ? 0 : -1;
+    this.render();
+    this.fireCellChanged();
+  }
+
+  /** Rebuild the cell ID → index lookup map. */
+  private rebuildCellIdMap(): void {
+    this.cellIdToIndex.clear();
+    if (!this.currentWalk) return;
+    for (let i = 0; i < this.currentWalk.cells.length; i++) {
+      this.cellIdToIndex.set(this.currentWalk.cells[i].id, i);
+    }
   }
 
   private fireCellChanged(): void {
@@ -287,6 +382,9 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
 
     const totalCells = walk.cells.length;
     const hasSteps = cell.steps && cell.steps.length > 0 && stepIndex >= 0;
+    const hasBranching = cell.nextCellIds && cell.nextCellIds.length > 1;
+    const canGoBack = this.navigationHistory.length > 0;
+    const isEndCell = this.isEndCell(cell, walk);
 
     // Build narrative — in step mode, show current step prominently
     let narrativeHtml = '';
@@ -317,12 +415,15 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
         return `<span class="${cls}" data-step="${i}"></span>`;
       }).join('');
       stepsBarHtml = `<div class="steps-bar">
-        <button class="step-btn" id="prevStepBtn" ${stepIndex === 0 ? 'disabled' : ''}>◀</button>
+        <button class="step-btn" id="prevStepBtn" ${stepIndex === 0 ? 'disabled' : ''}>&#9664;</button>
         <span class="step-counter">Step ${stepIndex + 1}/${cell.steps!.length}</span>
-        <button class="step-btn" id="nextStepBtn" ${stepIndex === cell.steps!.length - 1 ? 'disabled' : ''}>▶</button>
+        <button class="step-btn" id="nextStepBtn" ${stepIndex === cell.steps!.length - 1 ? 'disabled' : ''}>&#9654;</button>
         <div class="step-dots">${dots}</div>
       </div>`;
     }
+
+    // Build branch options UI
+    const branchOptionsHtml = hasBranching ? this.renderBranchOptions(cell) : '';
 
     // Build variables
     const variablesHtml = this.renderVariables(cell);
@@ -330,7 +431,7 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
     // Build call stack
     const callStackHtml = this.renderCallStack(cell);
 
-    // Build cell list (mini nav)
+    // Build cell list (mini nav — tree-aware)
     const cellListHtml = this.renderCellList(walk, activeIndex);
 
     // Cell type badge
@@ -346,6 +447,9 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
       ? (cell.confidence >= 0.8 ? 'conf-high' : cell.confidence >= 0.5 ? 'conf-mid' : 'conf-low')
       : '';
 
+    // Navigation path breadcrumb
+    const breadcrumbHtml = this.renderBreadcrumb(walk);
+
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -357,14 +461,17 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
   <div class="walk-header">
     <div class="walk-name">${escapeHtml(walk.name)}</div>
     <div class="cell-nav">
-      <button class="nav-btn" id="prevBtn" ${activeIndex === 0 ? 'disabled' : ''}>▲ Prev</button>
+      <button class="nav-btn" id="prevBtn" ${!canGoBack ? 'disabled' : ''}>&#9650; Prev</button>
       <span class="cell-counter">${activeIndex + 1} / ${totalCells}</span>
-      <button class="nav-btn" id="nextBtn" ${activeIndex === totalCells - 1 ? 'disabled' : ''}>▼ Next</button>
+      <button class="nav-btn" id="nextBtn" ${isEndCell ? 'disabled' : ''} ${hasBranching ? 'style="opacity:0.3" title="Choose a branch below"' : ''}>&#9660; Next</button>
     </div>
   </div>
 
+  ${breadcrumbHtml}
+
   <div class="cell-header">
     <span class="badge ${typeClass}">${typeLabel}</span>
+    ${hasBranching ? '<span class="badge type-branch-point">BRANCH POINT</span>' : ''}
     <span class="badge ${statusClass}">${cell.status}</span>
     ${confPct ? `<span class="badge ${confClass}">${confPct}</span>` : ''}
     <span class="cell-depth">Depth: ${cell.stackDepth}</span>
@@ -374,6 +481,7 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
 
   ${stepsBarHtml}
   ${narrativeHtml}
+  ${branchOptionsHtml}
   ${variablesHtml}
   ${callStackHtml}
 
@@ -409,6 +517,13 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
         });
       });
 
+      document.querySelectorAll('.branch-option-btn').forEach(el => {
+        el.addEventListener('click', () => {
+          const branchIndex = parseInt(el.getAttribute('data-branch-index') || '0', 10);
+          vscode.postMessage({ type: 'selectBranch', branchIndex });
+        });
+      });
+
       document.querySelectorAll('.cell-item').forEach(el => {
         el.addEventListener('click', () => {
           const index = parseInt(el.getAttribute('data-index') || '0', 10);
@@ -430,6 +545,77 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
   </script>
 </body>
 </html>`;
+  }
+
+  /**
+   * Determine if a cell is an end cell (no further navigation possible).
+   */
+  private isEndCell(cell: WalkCell, walk: CodeWalk): boolean {
+    // If it has explicit nextCellIds, it's only an end if the array is empty
+    if (cell.nextCellIds) {
+      return cell.nextCellIds.length === 0;
+    }
+    // Otherwise, linear — it's the end if it's the last cell
+    return cell.index >= walk.cells.length - 1;
+  }
+
+  /**
+   * Render the branch options UI for a cell with multiple nextCellIds.
+   */
+  private renderBranchOptions(cell: WalkCell): string {
+    if (!cell.nextCellIds || cell.nextCellIds.length <= 1) return '';
+
+    const options = cell.nextCellIds.map((nextId, i) => {
+      const option: BranchOption | undefined = cell.branchOptions?.[i];
+      const label = option?.label ?? `Path ${i + 1}`;
+      const description = option?.description ?? `Go to ${nextId}`;
+      const condition = option?.condition ? `<div class="branch-condition">${escapeHtml(option.condition)}</div>` : '';
+      const hint = option?.pathHint ?? 'default';
+      const hintClass = `branch-hint-${hint}`;
+
+      return `<div class="branch-option ${hintClass}">
+        <button class="branch-option-btn" data-branch-index="${i}">
+          <span class="branch-option-icon">${this.getBranchHintIcon(hint)}</span>
+          <span class="branch-option-label">${escapeHtml(label)}</span>
+        </button>
+        <div class="branch-option-desc">${escapeHtml(description)}</div>
+        ${condition}
+      </div>`;
+    }).join('\n');
+
+    return `<section class="section branch-section">
+      <h3>Choose a Path</h3>
+      <div class="branch-options">${options}</div>
+    </section>`;
+  }
+
+  /**
+   * Render breadcrumb trail showing the path taken through branches.
+   */
+  private renderBreadcrumb(walk: CodeWalk): string {
+    if (this.navigationHistory.length === 0) return '';
+
+    // Show last 5 cells in the path + current
+    const pathIndices = [...this.navigationHistory.slice(-5), this.currentCellIndex];
+    const crumbs = pathIndices.map((idx, i) => {
+      const c = walk.cells[idx];
+      if (!c) return '';
+      const isLast = i === pathIndices.length - 1;
+      const label = this.getCellLabel(c);
+      const truncated = this.navigationHistory.length > 5 && i === 0;
+      return `<span class="breadcrumb-item ${isLast ? 'breadcrumb-current' : ''}">${truncated ? '... &rarr; ' : ''}${escapeHtml(label)}${isLast ? '' : ' &rarr; '}</span>`;
+    }).join('');
+
+    return `<div class="breadcrumb">${crumbs}</div>`;
+  }
+
+  private getBranchHintIcon(hint: string): string {
+    switch (hint) {
+      case 'taken': return '&#10003;';    // checkmark
+      case 'skipped': return '&#10007;';  // cross
+      case 'error': return '&#9888;';     // warning
+      default: return '&#10140;';         // arrow
+    }
   }
 
   private renderCodeSlice(cell: WalkCell): string {
@@ -457,9 +643,9 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
 
     const scopeHtmls = cell.state.scopes.map(scope => {
       const varRows = Object.entries(scope.variables).map(([name, v]) => {
-        const actionIcon = v.action === 'created' ? '🆕'
-          : v.action === 'modified' ? '✏️'
-          : v.action === 'read' ? '👁'
+        const actionIcon = v.action === 'created' ? '&#x1F195;'
+          : v.action === 'modified' ? '&#x270F;&#xFE0F;'
+          : v.action === 'read' ? '&#x1F441;'
           : '';
         const changedClass = v.changed ? 'var-changed' : '';
         return `<div class="var-row ${changedClass}">
@@ -515,12 +701,16 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
   private renderCellList(walk: CodeWalk, activeIndex: number): string {
     return walk.cells.map((cell, idx) => {
       const isActive = idx === activeIndex;
+      const isInHistory = this.navigationHistory.includes(idx);
       const indent = '  '.repeat(cell.stackDepth);
       const typeIcon = this.getCellTypeIcon(cell.type);
-      return `<div class="cell-item ${isActive ? 'cell-active' : ''}" data-index="${idx}">
+      const hasBranch = cell.nextCellIds && cell.nextCellIds.length > 1;
+      const branchIcon = hasBranch ? '<span class="cell-branch-icon" title="Branch point">&#9733;</span>' : '';
+      return `<div class="cell-item ${isActive ? 'cell-active' : ''} ${isInHistory ? 'cell-visited' : ''}" data-index="${idx}">
         <span class="cell-indent">${indent}</span>
         <span class="cell-icon">${typeIcon}</span>
         <span class="cell-label">${escapeHtml(this.getCellLabel(cell))}</span>
+        ${branchIcon}
         <span class="cell-status-dot status-dot-${cell.status}"></span>
       </div>`;
     }).join('\n');
@@ -531,28 +721,28 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
     const shortFunc = func.split('::').pop() ?? func;
     switch (cell.type) {
       case 'entry': return shortFunc || 'Entry';
-      case 'call': return `→ ${shortFunc}`;
+      case 'call': return `\u2192 ${shortFunc}`;
       case 'branch': return `? Branch`;
       case 'assignment': return `= Assign`;
-      case 'return': return `← Return`;
-      case 'dispatch': return `⟿ Dispatch`;
-      case 'block': return `▪ Block`;
-      case 'note': return `✎ Note`;
+      case 'return': return `\u2190 Return`;
+      case 'dispatch': return `\u27BF Dispatch`;
+      case 'block': return `\u25AA Block`;
+      case 'note': return `\u270E Note`;
       default: return cell.type;
     }
   }
 
   private getCellTypeIcon(type: string): string {
     switch (type) {
-      case 'entry': return '▶';
-      case 'call': return '→';
+      case 'entry': return '&#9654;';
+      case 'call': return '&rarr;';
       case 'branch': return '?';
       case 'assignment': return '=';
-      case 'return': return '←';
-      case 'dispatch': return '⟿';
-      case 'block': return '▪';
-      case 'note': return '✎';
-      default: return '·';
+      case 'return': return '&larr;';
+      case 'dispatch': return '&#10239;';
+      case 'block': return '&#9642;';
+      case 'note': return '&#9998;';
+      default: return '&middot;';
     }
   }
 
@@ -586,6 +776,7 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
         --yellow: var(--vscode-charts-yellow, #ff9800);
         --red: var(--vscode-charts-red, #f44336);
         --blue: var(--vscode-charts-blue, #2196f3);
+        --purple: var(--vscode-charts-purple, #9c27b0);
         --hover-bg: var(--vscode-list-hoverBackground, rgba(128,128,128,0.12));
         --active-bg: var(--vscode-list-activeSelectionBackground, rgba(0,120,215,0.15));
         --code-bg: var(--vscode-textCodeBlock-background, rgba(128,128,128,0.1));
@@ -654,6 +845,27 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
         text-align: center;
       }
 
+      /* Breadcrumb trail */
+      .breadcrumb {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 2px;
+        font-size: 10px;
+        color: var(--muted);
+        margin-bottom: 8px;
+        padding: 4px 6px;
+        background: var(--code-bg);
+        border-radius: 4px;
+      }
+      .breadcrumb-item {
+        white-space: nowrap;
+      }
+      .breadcrumb-current {
+        color: var(--link);
+        font-weight: 600;
+      }
+
       /* Cell header */
       .cell-header {
         display: flex;
@@ -678,11 +890,17 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
       .type-entry { background: var(--blue); color: #fff; }
       .type-call { background: #2196f3; color: #fff; }
       .type-branch { background: #ff9800; color: #fff; }
+      .type-branch-point { background: var(--purple); color: #fff; animation: pulse-badge 2s infinite; }
       .type-assignment { background: #795548; color: #fff; }
       .type-return { background: #607d8b; color: #fff; }
       .type-dispatch { background: #9c27b0; color: #fff; }
       .type-block { background: #455a64; color: #fff; }
       .type-note { background: #78909c; color: #fff; }
+
+      @keyframes pulse-badge {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+      }
 
       .status-skeleton { background: var(--muted); color: #fff; }
       .status-partial { background: var(--yellow); color: #000; }
@@ -787,6 +1005,92 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
         line-height: 1.6;
         white-space: pre-wrap;
         word-wrap: break-word;
+      }
+
+      /* Branch options */
+      .branch-section h3 {
+        color: var(--purple);
+        border-bottom-color: var(--purple);
+      }
+
+      .branch-options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .branch-option {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px;
+        transition: border-color 0.15s, background 0.15s;
+      }
+
+      .branch-option:hover {
+        border-color: var(--link);
+        background: var(--hover-bg);
+      }
+
+      .branch-hint-taken {
+        border-left: 3px solid var(--green);
+      }
+      .branch-hint-skipped {
+        border-left: 3px solid var(--red);
+        opacity: 0.8;
+      }
+      .branch-hint-error {
+        border-left: 3px solid var(--yellow);
+      }
+      .branch-hint-default {
+        border-left: 3px solid var(--blue);
+      }
+
+      .branch-option-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--badge-bg);
+        color: var(--badge-fg);
+        border: none;
+        padding: 4px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-family: var(--font);
+        font-weight: 600;
+        width: 100%;
+        text-align: left;
+      }
+
+      .branch-option-btn:hover {
+        opacity: 0.85;
+      }
+
+      .branch-option-icon {
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+
+      .branch-option-label {
+        flex: 1;
+      }
+
+      .branch-option-desc {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 4px;
+        line-height: 1.4;
+      }
+
+      .branch-condition {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 3px;
+        padding: 2px 6px;
+        background: var(--code-bg);
+        border-radius: 3px;
+        display: inline-block;
       }
 
       /* Variables */
@@ -928,6 +1232,10 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
         background: var(--active-bg);
         font-weight: 600;
       }
+      .cell-item.cell-visited {
+        opacity: 0.85;
+        border-left: 2px solid var(--green);
+      }
 
       .cell-indent {
         white-space: pre;
@@ -948,6 +1256,13 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .cell-branch-icon {
+        color: var(--purple);
+        font-size: 10px;
+        margin-left: 2px;
+        flex-shrink: 0;
       }
 
       .cell-status-dot {

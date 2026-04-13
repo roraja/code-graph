@@ -2,20 +2,20 @@
   "_format": "codegraph-codewalk-v2",
   "walk": {
     "id": "resize-image-walk",
-    "name": "ImageProcessor.resizeImage — Processing a JPEG",
-    "description": "Traces the execution path when an ImageProcessor receives a valid JPEG file: entry into process(), the supports() check, the resizeImage() call, and the final return of a successful ProcessResult.",
-    "cellIds": ["cell-0", "cell-1", "cell-2", "cell-3", "cell-4", "cell-5"],
+    "name": "ImageProcessor.resizeImage — Processing a JPEG (with branching)",
+    "description": "Traces the execution path when an ImageProcessor receives a file: entry into process(), the supports() check, and then a branch — explore what happens with a supported JPEG (resizeImage + success) or an unsupported type like BMP (early error return).",
+    "cellIds": ["cell-0", "cell-1", "cell-2", "cell-3", "cell-4", "cell-5", "cell-6", "cell-7"],
     "meta": {
       "contributors": [
         {
           "tool": "ai:claude",
-          "fieldsPopulated": ["code", "narrative", "state", "callStack", "highlights"],
-          "timestamp": "2026-04-12T00:00:00Z"
+          "fieldsPopulated": ["code", "narrative", "state", "callStack", "highlights", "nextCellIds", "branchOptions"],
+          "timestamp": "2026-04-13T00:00:00Z"
         }
       ],
       "createdAt": "2026-04-12T00:00:00Z",
-      "updatedAt": "2026-04-12T00:00:00Z",
-      "tags": ["#image-processing", "#sample-project"],
+      "updatedAt": "2026-04-13T00:00:00Z",
+      "tags": ["#image-processing", "#sample-project", "#branching"],
       "entryPoint": {
         "filePath": "test/fixtures/sample-project/src/processors.ts",
         "line": 6,

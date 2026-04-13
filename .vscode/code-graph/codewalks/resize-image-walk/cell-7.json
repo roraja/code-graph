@@ -1,0 +1,46 @@
+{
+  "_format": "codegraph-cell-v1",
+  "walkId": "resize-image-walk",
+  "cell": {
+    "id": "cell-7",
+    "index": 7,
+    "type": "return",
+    "code": {
+      "filePath": "test/fixtures/sample-project/src/processors.ts",
+      "startLine": 8,
+      "endLine": 13,
+      "text": "      return {\n        success: false,\n        message: `Unsupported image type: ${file.mimeType}`,\n        processedBytes: 0,\n      };\n    }",
+      "highlights": [
+        { "line": 8, "type": "returned", "annotation": "Early return with error result" }
+      ]
+    },
+    "narrative": "The method returns early with an error ProcessResult. The caller receives { success: false, message: \"Unsupported image type: image/bmp\", processedBytes: 0 }. The resizeImage() method is never called — the unsupported file is rejected immediately.\n\nThis is the end of the \"unsupported type\" path. Use Prev to go back to the branch point and try the supported path instead.",
+    "state": {
+      "scopes": [
+        {
+          "name": "local",
+          "variables": {
+            "<return>": {
+              "value": "{ success: false, message: \"Unsupported image type: image/bmp\", processedBytes: 0 }",
+              "type": "ProcessResult",
+              "changed": true,
+              "action": "created",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
+              "rationale": "Error result — BMP is not a supported image type"
+            }
+          }
+        }
+      ],
+      "changes": ["<return>: -> { success: false, message: \"Unsupported image type: image/bmp\", processedBytes: 0 }"]
+    },
+    "stackDepth": 0,
+    "parentCellId": "cell-0",
+    "nextCellIds": [],
+    "callStack": [
+      { "functionName": "ImageProcessor.process", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" }
+    ],
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
+    "confidence": 1.0,
+    "status": "complete"
+  }
+}

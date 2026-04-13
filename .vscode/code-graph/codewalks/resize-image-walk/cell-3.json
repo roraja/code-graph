@@ -11,40 +11,49 @@
       "endLine": 13,
       "text": "    if (!this.supports(file.mimeType)) {\n      return {\n        success: false,\n        message: `Unsupported image type: ${file.mimeType}`,\n        processedBytes: 0,\n      };\n    }",
       "highlights": [
-        { "line": 7, "type": "branched", "annotation": "Condition: !true === false → skip error return" },
-        { "line": 8, "type": "skipped" },
-        { "line": 9, "type": "skipped" },
-        { "line": 10, "type": "skipped" },
-        { "line": 11, "type": "skipped" },
-        { "line": 12, "type": "skipped" },
-        { "line": 13, "type": "skipped" }
+        { "line": 7, "type": "branched", "annotation": "Branch: is the file type supported?" }
       ]
     },
-    "narrative": "The guard clause evaluates !this.supports(\"image/jpeg\") which is !true === false. The early-return block is skipped entirely, and execution continues to the resizeImage() call on line 15.",
+    "narrative": "This is the key decision point. The guard clause evaluates !this.supports(file.mimeType). If supports() returned true (type is supported), the negation makes it false and we skip the error block, proceeding to resizeImage(). If supports() returned false (unsupported type), the condition is true and we enter the error-return block.\n\nChoose a path below to explore what happens in each case.",
     "state": {
       "scopes": [
         {
           "name": "local",
           "variables": {
             "!this.supports(file.mimeType)": {
-              "value": "false",
+              "value": "depends on mimeType",
               "type": "boolean",
               "changed": true,
               "action": "created",
-              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
-              "rationale": "supports() returned true, so negation is false"
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
+              "rationale": "Negation of supports() result determines the branch"
             }
           }
         }
       ],
-      "changes": ["branch condition: false (skip error path)"]
+      "changes": ["branch condition: depends on whether file type is supported"]
     },
     "stackDepth": 0,
     "parentCellId": "cell-0",
+    "nextCellIds": ["cell-4", "cell-6"],
+    "branchOptions": [
+      {
+        "label": "Supported type (e.g. JPEG)",
+        "description": "The file's mimeType IS in supportedTypes. supports() returns true, so !true === false and we skip the error block. Execution proceeds to resizeImage().",
+        "condition": "!this.supports(\"image/jpeg\") === false",
+        "pathHint": "taken"
+      },
+      {
+        "label": "Unsupported type (e.g. BMP)",
+        "description": "The file's mimeType is NOT in supportedTypes. supports() returns false, so !false === true and we enter the error-return block with success: false.",
+        "condition": "!this.supports(\"image/bmp\") === true",
+        "pathHint": "error"
+      }
+    ],
     "callStack": [
       { "functionName": "ImageProcessor.process", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" }
     ],
-    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
     "confidence": 1.0,
     "status": "complete"
   }

@@ -15,7 +15,7 @@
         { "line": 16, "type": "returned", "annotation": "Return successful ProcessResult" }
       ]
     },
-    "narrative": "Back in process(), the return value of resizeImage() (1,048,576) is stored in processedBytes. The method then returns a successful ProcessResult with the file name and byte count. The caller receives confirmation that \"photo.jpg\" was processed with 1 MB of output.",
+    "narrative": "Back in process(), the return value of resizeImage() (1,048,576) is stored in processedBytes. The method then returns a successful ProcessResult with the file name and byte count. The caller receives confirmation that \"photo.jpg\" was processed with 1 MB of output.\n\nThis is the end of the \"supported type\" path. Use Prev to go back and try the other branch.",
     "state": {
       "scopes": [
         {
@@ -26,7 +26,7 @@
               "type": "number",
               "changed": true,
               "action": "created",
-              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
               "rationale": "Assigned from resizeImage() return value"
             },
             "<return>": {
@@ -34,20 +34,21 @@
               "type": "ProcessResult",
               "changed": true,
               "action": "created",
-              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
               "rationale": "Successful result with the capped file size"
             }
           }
         }
       ],
-      "changes": ["processedBytes: → 1048576", "<return>: → { success: true, ... }"]
+      "changes": ["processedBytes: -> 1048576", "<return>: -> { success: true, ... }"]
     },
     "stackDepth": 0,
     "parentCellId": "cell-0",
+    "nextCellIds": [],
     "callStack": [
       { "functionName": "ImageProcessor.process", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" }
     ],
-    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
     "confidence": 1.0,
     "status": "complete"
   }

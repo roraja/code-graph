@@ -30,6 +30,7 @@ but it fails for some reason. Can you check and fix all the issues until you are
 - In code walk, if there is branching, ask user to select a branch - like giving options list and letting user select
 - Modify the codewalk generator skills and schema to have a tree kind of structure. Each cell can point to one or more next cells. In case there are multiple next cells, simply in the UI of Vscode, ask user to select which path to take. Have enough info for user to decide which path to explore using walks.
 - This way, for walking complex functions with multiple if statements, I can explore all possible branches easily
+- Implement this for test codewalk here to demonstrate branching - .vscode/code-graph/codewalks/resize-image-walk
 
 
 ---

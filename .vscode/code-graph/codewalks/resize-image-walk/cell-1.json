@@ -11,10 +11,10 @@
       "endLine": 7,
       "text": "    if (!this.supports(file.mimeType)) {",
       "highlights": [
-        { "line": 7, "type": "called", "annotation": "Call this.supports(\"image/jpeg\")" }
+        { "line": 7, "type": "called", "annotation": "Call this.supports(file.mimeType)" }
       ]
     },
-    "narrative": "Before processing, process() calls this.supports() to verify the mime type is one the ImageProcessor handles. We pass \"image/jpeg\" which is in the supportedTypes array.",
+    "narrative": "Before processing, process() calls this.supports() to verify the mime type is one the ImageProcessor handles. The return value will determine which branch we take.",
     "state": {
       "scopes": [
         {
@@ -25,7 +25,7 @@
               "type": "string",
               "changed": false,
               "action": "read",
-              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 0.95 }
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 0.95 }
             }
           }
         }
@@ -33,10 +33,11 @@
     },
     "stackDepth": 0,
     "parentCellId": "cell-0",
+    "nextCellIds": ["cell-2"],
     "callStack": [
       { "functionName": "ImageProcessor.process", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" }
     ],
-    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 0.95 },
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 0.95 },
     "confidence": 0.95,
     "status": "complete"
   }

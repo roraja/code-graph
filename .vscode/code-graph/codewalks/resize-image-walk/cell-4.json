@@ -11,12 +11,12 @@
       "endLine": 31,
       "text": "  private resizeImage(file: FileData): number {\n    // Simulated image resize logic\n    const targetSize = Math.min(file.fileSize, 1024 * 1024);\n    return targetSize;\n  }",
       "highlights": [
-        { "line": 27, "type": "executed", "annotation": "Enter resizeImage()" },
+        { "line": 27, "type": "executed", "annotation": "Enter resizeImage() — supported type path" },
         { "line": 29, "type": "assigned", "annotation": "targetSize = Math.min(2097152, 1048576) = 1048576" },
         { "line": 30, "type": "returned", "annotation": "return 1048576 (1 MB cap)" }
       ]
     },
-    "narrative": "resizeImage() is the core processing logic. It caps the file size at 1 MB (1024 * 1024 = 1,048,576 bytes). Since our input file is 2 MB (2,097,152 bytes), Math.min picks the 1 MB cap. The method returns 1,048,576 as the number of processed bytes.",
+    "narrative": "We took the \"supported type\" path. Since \"image/jpeg\" is in supportedTypes, the guard clause was skipped and we reached resizeImage().\n\nresizeImage() is the core processing logic. It caps the file size at 1 MB (1024 * 1024 = 1,048,576 bytes). Since our input file is 2 MB (2,097,152 bytes), Math.min picks the 1 MB cap. The method returns 1,048,576 as the number of processed bytes.",
     "state": {
       "scopes": [
         {
@@ -27,7 +27,7 @@
               "type": "FileData",
               "changed": false,
               "action": "read",
-              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 0.95 }
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 0.95 }
             }
           }
         },
@@ -39,21 +39,22 @@
               "type": "number",
               "changed": true,
               "action": "created",
-              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
               "rationale": "Math.min(2097152, 1048576) = 1048576 — the 1 MB cap is smaller than the 2 MB file"
             }
           }
         }
       ],
-      "changes": ["targetSize: → 1048576"]
+      "changes": ["targetSize: -> 1048576"]
     },
     "stackDepth": 1,
     "parentCellId": "cell-0",
+    "nextCellIds": ["cell-5"],
     "callStack": [
       { "functionName": "ImageProcessor.process", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" },
       { "functionName": "ImageProcessor.resizeImage", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 27, "depth": 1, "cellId": "cell-4" }
     ],
-    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
     "confidence": 1.0,
     "status": "complete"
   }

@@ -71,6 +71,7 @@ export type {
   CellCorrection,
   PodcastSegment,
   CellStep,
+  BranchOption,
   CodeWalkFileData,
   CodeWalkManifest,
   CodeWalkCellFileData,

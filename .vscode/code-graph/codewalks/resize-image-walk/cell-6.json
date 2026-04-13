@@ -1,0 +1,63 @@
+{
+  "_format": "codegraph-cell-v1",
+  "walkId": "resize-image-walk",
+  "cell": {
+    "id": "cell-6",
+    "index": 6,
+    "type": "branch",
+    "code": {
+      "filePath": "test/fixtures/sample-project/src/processors.ts",
+      "startLine": 7,
+      "endLine": 13,
+      "text": "    if (!this.supports(file.mimeType)) {\n      return {\n        success: false,\n        message: `Unsupported image type: ${file.mimeType}`,\n        processedBytes: 0,\n      };\n    }",
+      "highlights": [
+        { "line": 7, "type": "branched", "annotation": "Condition: !false === true -> enter error block" },
+        { "line": 8, "type": "executed", "annotation": "Enter the early-return error block" },
+        { "line": 9, "type": "assigned", "annotation": "success: false" },
+        { "line": 10, "type": "assigned", "annotation": "message: \"Unsupported image type: image/bmp\"" },
+        { "line": 11, "type": "assigned", "annotation": "processedBytes: 0" }
+      ]
+    },
+    "narrative": "We took the \"unsupported type\" path. The file has mimeType \"image/bmp\" which is NOT in supportedTypes [\"image/png\", \"image/jpeg\", \"image/gif\"]. supports() returned false, so !false === true and the guard clause fires.\n\nWe enter the early-return block which builds an error ProcessResult with success: false and a descriptive message.",
+    "state": {
+      "scopes": [
+        {
+          "name": "parameters",
+          "variables": {
+            "file": {
+              "value": "{ fileName: \"diagram.bmp\", fileSize: 4194304, mimeType: \"image/bmp\", content: <Buffer ...> }",
+              "type": "FileData",
+              "changed": false,
+              "action": "read",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 0.95 },
+              "rationale": "A 4 MB BMP file — not in supportedTypes"
+            }
+          }
+        },
+        {
+          "name": "local",
+          "variables": {
+            "!this.supports(file.mimeType)": {
+              "value": "true",
+              "type": "boolean",
+              "changed": true,
+              "action": "created",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
+              "rationale": "supports(\"image/bmp\") returns false, negation is true"
+            }
+          }
+        }
+      ],
+      "changes": ["branch condition: true (enter error path)"]
+    },
+    "stackDepth": 0,
+    "parentCellId": "cell-0",
+    "nextCellIds": ["cell-7"],
+    "callStack": [
+      { "functionName": "ImageProcessor.process", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" }
+    ],
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
+    "confidence": 1.0,
+    "status": "complete"
+  }
+}
