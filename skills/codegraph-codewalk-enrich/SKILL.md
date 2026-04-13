@@ -131,3 +131,41 @@ Update `walk.meta.updatedAt`.
 - **Track provenance** — every value you add should have `source.tool: "ai:claude"` and a reasonable confidence
 - **Static analyzers are optional** — read code directly, but leverage clangd/IntelliSense if available for type information
 - **Add sub-steps to dense cells** — if a cell has 3+ conceptually distinct lines, add a `steps` array. Each step has `description` (what this line does) and `focusLine` (1-based line number to highlight). The viewer shows one step at a time for clarity. See the `codewalk-populate` skill for the `CellStep` structure.
+- **Add branching to conditional cells** — when enriching a `branch` cell that evaluates a condition (if/switch/ternary), consider adding `nextCellIds` and `branchOptions` to let users explore multiple execution paths. See the "Branching" section below.
+
+## Branching Support
+
+When enriching branch cells, you can convert a linear walk into a tree-structured walk by adding branching:
+
+### When to Add Branching
+
+- A `branch` cell evaluates a condition but only shows ONE path
+- The user asks to "add the other branch" or "show what happens if..."
+- The code has meaningful alternative paths worth exploring
+
+### How to Add Branching
+
+1. **On the branch cell**: Set `nextCellIds` to an array of cell IDs for each path. Add `branchOptions` with labels and descriptions.
+2. **Create cells for the new path**: Add new cell files for the alternative execution path (e.g., `cell-6.json`, `cell-7.json`).
+3. **Mark terminal cells**: Cells at the end of each path should have `nextCellIds: []`.
+4. **Update the manifest**: Add the new cell IDs to the manifest's `cellIds` array.
+
+### BranchOption Structure
+
+```typescript
+interface BranchOption {
+  label: string;           // Short label, e.g. "true — valid credentials"
+  description: string;     // What happens on this path
+  condition?: string;      // The condition, e.g. "isValid === true"
+  pathHint?: 'taken' | 'skipped' | 'error' | 'default';  // Visual hint
+}
+```
+
+### nextCellIds Semantics
+
+| Value | Meaning |
+|-------|---------|
+| Omitted | Linear navigation (next by index) |
+| `[]` | End cell — no further navigation |
+| `["cell-5"]` | Explicit next cell |
+| `["cell-4", "cell-6"]` | Branch point — user chooses |

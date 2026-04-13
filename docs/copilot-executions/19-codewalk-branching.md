@@ -129,7 +129,6 @@ Major changes:
 - Existing tests all pass
 
 ### Remaining / follow-up:
-- The codewalk generator skills (codegraph-codewalk-populate, etc.) should be updated to support generating branching walks
 - Could add a visual tree/graph visualization in the cell list showing the branch structure
 - Could add keyboard shortcuts for branch selection (1, 2, 3 keys)
 
@@ -149,4 +148,8 @@ Major changes:
 | .vscode/code-graph/codewalks/resize-image-walk/cell-5.json | Modified | Terminal cell (nextCellIds: []) |
 | .vscode/code-graph/codewalks/resize-image-walk/cell-6.json | Created | New: unsupported type path (error block) |
 | .vscode/code-graph/codewalks/resize-image-walk/cell-7.json | Created | New: error return result (terminal) |
+| .claude/skills/codewalk-populate/skills/SKILL.md | Modified | Added `nextCellIds`, `branchOptions`, `BranchOption` to WalkCell spec; added branching procedure and example |
+| .claude/skills/codewalk-enrich/skills/SKILL.md | Modified | Added branching support section with when/how guidance |
+| skills/codegraph-codewalk-populate/SKILL.md | Modified | Added `nextCellIds`, `branchOptions`, `BranchOption` to WalkCell spec; added branching procedure |
+| skills/codegraph-codewalk-enrich/SKILL.md | Modified | Added branching support section with when/how guidance |
 | docs/copilot-executions/19-codewalk-branching.md | Created | This execution log |

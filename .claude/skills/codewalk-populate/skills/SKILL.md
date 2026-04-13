@@ -147,8 +147,35 @@ interface WalkCell {
   callStack?: CellCallStackFrame[];  // Full call stack at this cell
   confidence?: number;     // 0.0 - 1.0
   corrections?: CellCorrection[];
+  steps?: CellStep[];      // Sub-steps for guided focus within the cell
+
+  // Branching / tree navigation
+  nextCellIds?: string[];        // IDs of cells that can follow this one (see Branching section)
+  branchOptions?: BranchOption[];  // Describes each branch option for the user to choose
 }
 ```
+
+### BranchOption Structure (for tree-structured walks)
+
+When a cell has multiple `nextCellIds`, it's a **branch point** — the viewer asks the user to choose which path to explore. Each `BranchOption` gives the user enough context to decide.
+
+```typescript
+interface BranchOption {
+  label: string;           // Short label, e.g. "true — supported type"
+  description: string;     // What happens on this path
+  condition?: string;      // The condition expression, e.g. "mimeType === 'image/jpeg'"
+  pathHint?: 'taken' | 'skipped' | 'error' | 'default';  // Visual hint for the UI
+}
+```
+
+### nextCellIds Semantics
+
+| `nextCellIds` value | Behavior |
+|---------------------|----------|
+| Omitted / undefined | Linear navigation — next cell by index |
+| `[]` (empty array) | **End cell** — no further navigation |
+| `["cell-5"]` (single) | Explicit link to one next cell |
+| `["cell-4", "cell-6"]` (multiple) | **Branch point** — viewer shows options, user chooses |
 
 ### CodeSlice Structure
 
@@ -242,6 +269,18 @@ For each meaningful chunk of execution:
 7. **Block cells** (`type: 'block'`): Group sequential statements for brevity
 8. **Note cells** (`type: 'note'`): Pure commentary (summaries, architecture notes)
 
+#### Creating Branch Points (Tree Walks)
+
+When the code has an `if`, `switch`, or other conditional, create a **branch cell** that lets the user explore BOTH paths:
+
+1. Create the branch evaluation cell (type: `'branch'`) — shows the condition being evaluated
+2. Set `nextCellIds` to point to the first cell of EACH branch path (e.g., `["cell-4", "cell-6"]`)
+3. Add `branchOptions` with a `label`, `description`, and optional `condition` for each path
+4. Create cells for BOTH paths — each path should have its own sequence of cells
+5. Terminal cells at the end of each path should have `nextCellIds: []`
+
+The manifest's `cellIds` should list ALL cells across ALL branches (flat list). The tree structure is encoded via `nextCellIds` in each cell. Cells for different branches can have any index — they're navigated by ID, not by sequential order.
+
 ### Step 4: Populate Each Cell Fully
 
 For each cell, fill in:
@@ -321,6 +360,53 @@ For each cell, fill in:
 }
 ```
 
+## Example Branch Point Cell (Tree Walk)
+
+When a cell has multiple `nextCellIds`, it's a branch point. The user chooses which path to explore:
+
+```json
+{
+  "id": "cell-3",
+  "index": 3,
+  "type": "branch",
+  "code": {
+    "filePath": "src/processors.ts",
+    "startLine": 7,
+    "endLine": 13,
+    "text": "    if (!this.supports(file.mimeType)) {\n      return {\n        success: false,\n        message: `Unsupported image type: ${file.mimeType}`,\n        processedBytes: 0,\n      };\n    }",
+    "highlights": [
+      { "line": 7, "type": "branched", "annotation": "Branch: is the file type supported?" }
+    ]
+  },
+  "narrative": "This is the key decision point. Choose a path below to explore what happens for supported vs unsupported file types.",
+  "stackDepth": 0,
+  "parentCellId": "cell-0",
+  "nextCellIds": ["cell-4", "cell-6"],
+  "branchOptions": [
+    {
+      "label": "Supported type (e.g. JPEG)",
+      "description": "The file's mimeType IS in supportedTypes. Execution proceeds to resizeImage().",
+      "condition": "!this.supports(\"image/jpeg\") === false",
+      "pathHint": "taken"
+    },
+    {
+      "label": "Unsupported type (e.g. BMP)",
+      "description": "The file's mimeType is NOT in supportedTypes. Early return with error.",
+      "condition": "!this.supports(\"image/bmp\") === true",
+      "pathHint": "error"
+    }
+  ],
+  "callStack": [
+    { "functionName": "ImageProcessor.process", "filePath": "src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" }
+  ],
+  "source": { "tool": "ai:claude", "timestamp": "2026-04-13T00:00:00Z", "confidence": 1.0 },
+  "confidence": 1.0,
+  "status": "complete"
+}
+```
+
+In this example, `cell-4` is the first cell of the "supported" path and `cell-6` is the first cell of the "unsupported" path. Both paths have their own continuation cells and eventually reach terminal cells with `nextCellIds: []`.
+
 ## Important Notes
 
 - **Do NOT require static analyzers.** Read the code directly with AI understanding. Static analyzers (clangd, IntelliSense) can be used for faster evaluation but are never mandatory.
@@ -329,3 +415,5 @@ For each cell, fill in:
 - **Track `parentCellId`** — this builds the call hierarchy without nested JSON.
 - **Set `status` appropriately** — use 'skeleton' if only code is filled, 'partial' if narrative is added, 'complete' if state is also filled.
 - **Imagine realistic variable values** — use scenario context to choose plausible values.
+- **Create branch points for conditionals** — when there's an `if`/`switch` with meaningfully different paths, use `nextCellIds` with multiple entries and `branchOptions` so the user can explore all branches. Create cells for ALL paths, not just one.
+- **Mark terminal cells** — cells at the end of a branch path should have `nextCellIds: []`.
