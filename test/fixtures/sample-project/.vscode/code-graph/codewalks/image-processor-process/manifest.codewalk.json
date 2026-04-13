@@ -1,0 +1,26 @@
+{
+  "_format": "codegraph-codewalk-v2",
+  "walk": {
+    "id": "image-processor-process",
+    "name": "ImageProcessor.process() — Resize a JPEG Image",
+    "description": "Traces the ImageProcessor.process() method when called with a valid JPEG file. The processor checks MIME type support, delegates to resizeImage(), and returns a success result.",
+    "cellIds": ["cell-0", "cell-1", "cell-2", "cell-3"],
+    "meta": {
+      "contributors": [
+        {
+          "tool": "ai:claude",
+          "fieldsPopulated": ["code", "narrative", "state", "callStack", "highlights", "steps"],
+          "timestamp": "2026-04-12T12:00:00Z"
+        }
+      ],
+      "createdAt": "2026-04-12T12:00:00Z",
+      "updatedAt": "2026-04-12T12:00:00Z",
+      "tags": ["#image-processing", "#file-processor", "#typescript"],
+      "entryPoint": {
+        "filePath": "src/processors.ts",
+        "line": 6,
+        "functionName": "ImageProcessor.process"
+      }
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "_format": "codegraph-cell-v1",
+  "walkId": "image-processor-process",
+  "cell": {
+    "id": "cell-2",
+    "index": 2,
+    "type": "call",
+    "code": {
+      "filePath": "src/processors.ts",
+      "startLine": 27,
+      "endLine": 31,
+      "text": "  private resizeImage(file: FileData): number {\n    // Simulated image resize logic\n    const targetSize = Math.min(file.fileSize, 1024 * 1024);\n    return targetSize;\n  }",
+      "highlights": [
+        { "line": 27, "type": "executed", "annotation": "resizeImage() called" },
+        { "line": 29, "type": "assigned", "annotation": "targetSize = Math.min(2097152, 1048576) = 1048576" },
+        { "line": 30, "type": "returned", "annotation": "Return 1048576 bytes" }
+      ]
+    },
+    "narrative": "The private resizeImage() method simulates image resize logic. It caps the output at 1MB (1024 × 1024 bytes) using Math.min(). Since our 2MB JPEG exceeds the cap, the result is 1,048,576 bytes (1MB).",
+    "steps": [
+      {
+        "description": "Enter the private `resizeImage()` method. It takes the full `FileData` object and returns the number of processed bytes.",
+        "focusLine": 27
+      },
+      {
+        "description": "Calculate `targetSize` as the minimum of the file size (2,097,152 bytes = 2MB) and the 1MB cap (1,048,576 bytes). Since the file is larger than 1MB, `targetSize = 1,048,576`.",
+        "focusLine": 29
+      },
+      {
+        "description": "Return `targetSize` (1,048,576) to the caller. This value becomes `processedBytes` in the `process()` method.",
+        "focusLine": 30
+      }
+    ],
+    "state": {
+      "scopes": [
+        {
+          "name": "parameters",
+          "variables": {
+            "file": {
+              "value": "{ fileName: 'photo.jpg', fileSize: 2097152, mimeType: 'image/jpeg', content: <Buffer ...> }",
+              "type": "FileData",
+              "changed": false,
+              "action": "read",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T12:00:00Z", "confidence": 0.95 }
+            }
+          }
+        },
+        {
+          "name": "local",
+          "variables": {
+            "targetSize": {
+              "value": "1048576",
+              "type": "number",
+              "changed": true,
+              "action": "created",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T12:00:00Z", "confidence": 0.99 },
+              "rationale": "Math.min(2097152, 1048576) = 1048576 — file exceeds 1MB cap"
+            }
+          }
+        }
+      ],
+      "changes": ["targetSize: undefined → 1048576"]
+    },
+    "stackDepth": 1,
+    "parentCellId": "cell-0",
+    "callStack": [
+      { "functionName": "ImageProcessor.process", "filePath": "src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" },
+      { "functionName": "ImageProcessor.resizeImage", "filePath": "src/processors.ts", "line": 27, "depth": 1, "cellId": "cell-2" }
+    ],
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T12:00:00Z", "confidence": 0.99 },
+    "confidence": 0.99,
+    "status": "complete"
+  }
+}

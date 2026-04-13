@@ -147,6 +147,38 @@ interface WalkCell {
   callStack?: CellCallStackFrame[];  // Full call stack at this cell
   confidence?: number;     // 0.0 - 1.0
   corrections?: CellCorrection[];
+  steps?: CellStep[];      // Sub-steps for guided focus within the cell (see below)
+}
+```
+
+### CellStep Structure (Sub-Steps)
+
+Sub-steps break a cell into sequential focus points. When present, the viewer
+shows one step at a time — highlighting the `focusLine` strongly while the
+overall cell range gets a lighter background. This makes dense cells
+easier to understand by guiding the reader through one concept at a time.
+
+**When to use:** Add `steps` whenever a cell has 3+ lines of conceptually
+distinct code (e.g., a function body with initialization, a call, a branch,
+and a return). Each step should explain ONE line/concept.
+
+```typescript
+interface CellStep {
+  description: string;     // What this line/concept does
+  focusLine: number;       // Line to highlight strongly (1-based, absolute in file)
+  focusEndLine?: number;   // Optional end line for multi-line focus (1-based, inclusive)
+}
+```
+
+**Example:**
+```json
+{
+  "steps": [
+    { "description": "Check if the MIME type is supported by this processor", "focusLine": 7 },
+    { "description": "Return an error result for unsupported types", "focusLine": 8, "focusEndLine": 12 },
+    { "description": "Call resizeImage to process the file", "focusLine": 15 },
+    { "description": "Return success with the processed byte count", "focusLine": 16, "focusEndLine": 19 }
+  ]
 }
 ```
 
@@ -250,6 +282,7 @@ For each cell, fill in:
 - `state`: Imagine realistic variable values at this point
 - `callStack`: Build the full call stack from parent references
 - `highlights`: Mark which lines are executed, branched, assigned, etc.
+- `steps`: Add sub-steps for cells with 3+ conceptually distinct lines — each step focuses on one line/concept with a `description` and `focusLine`
 
 ### Step 5: Save the Files
 
@@ -329,3 +362,4 @@ For each cell, fill in:
 - **Track `parentCellId`** — this builds the call hierarchy without nested JSON.
 - **Set `status` appropriately** — use 'skeleton' if only code is filled, 'partial' if narrative is added, 'complete' if state is also filled.
 - **Imagine realistic variable values** — use scenario context to choose plausible values.
+- **Add `steps` to dense cells** — any cell with 3+ lines of distinct logic should have sub-steps. Each step focuses on one line/concept. The viewer shows one step at a time for clarity.

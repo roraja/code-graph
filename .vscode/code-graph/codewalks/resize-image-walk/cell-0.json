@@ -1,0 +1,56 @@
+{
+  "_format": "codegraph-cell-v1",
+  "walkId": "resize-image-walk",
+  "cell": {
+    "id": "cell-0",
+    "index": 0,
+    "type": "entry",
+    "code": {
+      "filePath": "test/fixtures/sample-project/src/processors.ts",
+      "startLine": 6,
+      "endLine": 21,
+      "text": "  async process(file: FileData): Promise<ProcessResult> {\n    if (!this.supports(file.mimeType)) {\n      return {\n        success: false,\n        message: `Unsupported image type: ${file.mimeType}`,\n        processedBytes: 0,\n      };\n    }\n\n    const processedBytes = this.resizeImage(file);\n    return {\n      success: true,\n      message: `Processed image ${file.fileName}`,\n      processedBytes,\n    };\n  }",
+      "highlights": [
+        { "line": 6, "type": "executed", "annotation": "Enter process() with a JPEG file" }
+      ]
+    },
+    "narrative": "A caller invokes ImageProcessor.process() with a FileData representing a 2 MB JPEG photo. This is the top-level entry point: the method will check whether the mime type is supported, resize the image if so, and return a ProcessResult.",
+    "state": {
+      "scopes": [
+        {
+          "name": "parameters",
+          "variables": {
+            "file": {
+              "value": "{ fileName: \"photo.jpg\", fileSize: 2097152, mimeType: \"image/jpeg\", content: <Buffer ...> }",
+              "type": "FileData",
+              "changed": false,
+              "action": "read",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 0.95 },
+              "rationale": "A realistic 2 MB JPEG file passed in by the caller"
+            }
+          }
+        },
+        {
+          "name": "this",
+          "variables": {
+            "supportedTypes": {
+              "value": "[\"image/png\", \"image/jpeg\", \"image/gif\"]",
+              "type": "string[]",
+              "changed": false,
+              "action": "read",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+              "rationale": "Initialized at class field declaration (line 4)"
+            }
+          }
+        }
+      ]
+    },
+    "stackDepth": 0,
+    "callStack": [
+      { "functionName": "ImageProcessor.process", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" }
+    ],
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 0.95 },
+    "confidence": 0.95,
+    "status": "complete"
+  }
+}

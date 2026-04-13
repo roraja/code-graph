@@ -1,0 +1,1999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeWalk Viewer</title>
+<style>
+/* =========================================================================
+   CodeWalk Viewer — VS Code Dark+ inspired standalone HTML viewer
+   Loads .codewalk.json files and renders an interactive step-by-step
+   walkthrough with syntax highlighting, line annotations, variables,
+   call stack, and keyboard navigation.
+   ========================================================================= */
+
+:root {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+  --bg-input: #3c3c3c;
+  --bg-hover: #2a2d2e;
+  --bg-active: rgba(0, 120, 215, 0.15);
+  --fg-primary: #d4d4d4;
+  --fg-secondary: #969696;
+  --fg-muted: #666;
+  --fg-bright: #e0e0e0;
+  --border: #3e3e42;
+  --accent: #569cd6;
+  --accent2: #4ec9b0;
+  --accent3: #dcdcaa;
+  --accent4: #ce9178;
+  --accent5: #c586c0;
+  --blue: #569cd6;
+  --green: #4caf50;
+  --yellow: #ff9800;
+  --red: #f44336;
+  --orange: #ce9178;
+  --purple: #9c27b0;
+  --teal: #4ec9b0;
+  --brown: #795548;
+  --gray: #607d8b;
+  --mono: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
+  --sans: 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
+  --radius: 4px;
+  --transition: 0.15s ease;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--fg-primary);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ---- Drop Zone (initial state) ---- */
+#drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 24px;
+  transition: background var(--transition);
+}
+
+#drop-zone.drag-over {
+  background: rgba(86, 156, 214, 0.08);
+}
+
+#drop-zone .logo {
+  font-size: 48px;
+  opacity: 0.6;
+}
+
+#drop-zone h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fg-bright);
+}
+
+#drop-zone p {
+  font-size: 13px;
+  color: var(--fg-secondary);
+  max-width: 460px;
+  text-align: center;
+  line-height: 1.7;
+}
+
+#drop-zone .file-btn {
+  padding: 10px 28px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: all var(--transition);
+}
+
+#drop-zone .file-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+#drop-zone .or {
+  color: var(--fg-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+#drop-zone .drop-hint {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+/* ---- Main Layout ---- */
+#viewer {
+  display: none;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#viewer.active {
+  display: flex;
+}
+
+/* ---- Top Bar ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  height: 40px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.topbar .walk-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.topbar .separator {
+  color: var(--fg-muted);
+}
+
+.topbar .cell-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.topbar .cell-counter {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-secondary);
+  white-space: nowrap;
+}
+
+.topbar .nav-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.topbar .nav-btn {
+  padding: 4px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--fg-primary);
+  font-size: 12px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.topbar .nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.topbar .nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.topbar .jump-input {
+  width: 44px;
+  padding: 3px 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--fg-primary);
+  font-size: 12px;
+  font-family: var(--mono);
+  text-align: center;
+  outline: none;
+}
+
+.topbar .jump-input:focus {
+  border-color: var(--accent);
+}
+
+.topbar .load-btn {
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--fg-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: all var(--transition);
+}
+
+.topbar .load-btn:hover {
+  color: var(--fg-primary);
+  border-color: var(--accent);
+}
+
+/* ---- Main Content Area ---- */
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ---- Cell Nav Sidebar ---- */
+.cell-nav {
+  width: 240px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.cell-nav .nav-header {
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.cell-nav .nav-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.cell-nav .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--mono);
+  border-radius: 0;
+  transition: background var(--transition);
+  border-left: 3px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell-nav .nav-item:hover {
+  background: var(--bg-hover);
+}
+
+.cell-nav .nav-item.active {
+  background: var(--bg-active);
+  border-left-color: var(--accent);
+}
+
+.cell-nav .nav-item .indent {
+  flex-shrink: 0;
+  color: var(--border);
+  font-size: 10px;
+}
+
+.cell-nav .nav-item .icon {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--fg-muted);
+}
+
+.cell-nav .nav-item .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.cell-nav .nav-item .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.status-dot.skeleton { background: var(--fg-muted); }
+.status-dot.partial { background: var(--yellow); }
+.status-dot.complete { background: var(--green); }
+.status-dot.corrected { background: #e91e63; }
+
+/* ---- Code Panel (center) ---- */
+.code-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* File tab bar */
+.file-tab-bar {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 0 8px;
+  gap: 12px;
+}
+
+.file-tab-bar .file-icon {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.file-tab-bar .file-path {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-tab-bar .line-range {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.file-tab-bar .confidence {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.confidence.high { background: rgba(76, 175, 80, 0.2); color: var(--green); }
+.confidence.mid { background: rgba(255, 152, 0, 0.2); color: var(--yellow); }
+.confidence.low { background: rgba(244, 67, 54, 0.2); color: var(--red); }
+
+/* Code area */
+.code-area {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 22px;
+  background: var(--bg-primary);
+}
+
+.code-line {
+  display: flex;
+  min-height: 22px;
+  padding: 0 16px 0 0;
+  border-left: 3px solid transparent;
+  transition: background 0.1s;
+}
+
+.code-line:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.line-gutter {
+  width: 52px;
+  text-align: right;
+  padding-right: 16px;
+  color: #555;
+  user-select: none;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.line-content {
+  flex: 1;
+  white-space: pre;
+  padding-left: 8px;
+  min-width: 0;
+}
+
+.line-annotation {
+  color: #6a9955;
+  font-style: italic;
+  margin-left: 24px;
+  font-size: 11px;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+/* Highlight types */
+.code-line.hl-executed {
+  background: rgba(86, 156, 214, 0.1);
+  border-left-color: var(--blue);
+}
+.code-line.hl-called {
+  background: rgba(78, 201, 176, 0.12);
+  border-left-color: var(--teal);
+}
+.code-line.hl-branched {
+  background: rgba(206, 145, 120, 0.12);
+  border-left-color: var(--orange);
+}
+.code-line.hl-assigned {
+  background: rgba(220, 220, 170, 0.12);
+  border-left-color: var(--accent3);
+}
+.code-line.hl-returned {
+  background: rgba(181, 206, 168, 0.12);
+  border-left-color: #b5cea8;
+}
+.code-line.hl-skipped {
+  background: rgba(128, 128, 128, 0.06);
+  border-left-color: #666;
+  opacity: 0.5;
+}
+
+/* Sub-step focus highlights */
+.code-line.hl-cell-range {
+  background: rgba(128, 128, 128, 0.06);
+}
+.code-line.hl-focus {
+  background: rgba(86, 156, 214, 0.22);
+  border-left-color: var(--accent);
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+/* Steps bar */
+.steps-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.steps-bar .step-nav-btn {
+  padding: 3px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--fg-primary);
+  font-size: 11px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.steps-bar .step-nav-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+.steps-bar .step-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.steps-bar .step-counter {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-secondary);
+  min-width: 40px;
+  text-align: center;
+}
+.steps-bar .step-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--fg-muted);
+}
+.step-description {
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg-primary);
+}
+.step-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+  opacity: 0.3;
+  transition: all var(--transition);
+  cursor: pointer;
+}
+.step-dot.active {
+  opacity: 1;
+  background: var(--accent);
+  transform: scale(1.3);
+}
+.step-dot.visited {
+  opacity: 0.7;
+  background: var(--green);
+}
+
+/* ---- Right Panel ---- */
+.right-panel {
+  width: 420px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.panel-tabs {
+  display: flex;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.panel-tab {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.panel-tab:hover {
+  color: var(--fg-secondary);
+}
+
+.panel-tab.active {
+  color: var(--fg-bright);
+  border-bottom-color: var(--accent);
+}
+
+.panel-tab .count {
+  font-size: 9px;
+  color: var(--accent);
+  margin-left: 3px;
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+/* Narrative */
+.narrative-text {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--fg-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.narrative-text strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.narrative-text code {
+  background: rgba(128, 128, 128, 0.15);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent4);
+}
+
+/* Variables */
+.scope-group {
+  margin-bottom: 14px;
+}
+
+.scope-name {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--fg-muted);
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+}
+
+.var-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  flex-wrap: wrap;
+}
+
+.var-row.changed {
+  background: rgba(255, 152, 0, 0.08);
+  border-left: 2px solid var(--yellow);
+  padding-left: 4px;
+}
+
+.var-action {
+  font-size: 10px;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.var-name {
+  color: #9cdcfe;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.var-type {
+  font-size: 9px;
+  color: var(--fg-muted);
+  background: rgba(128, 128, 128, 0.12);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.var-value {
+  color: var(--accent4);
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+
+.var-rationale {
+  width: 100%;
+  font-size: 10px;
+  color: var(--fg-muted);
+  font-style: italic;
+  padding-left: 22px;
+  margin-top: 2px;
+}
+
+.changes-summary {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 152, 0, 0.05);
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 152, 0, 0.15);
+}
+
+.changes-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin-bottom: 4px;
+}
+
+.change-item {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-primary);
+  padding: 2px 0;
+}
+
+/* Call Stack */
+.stack-frames {
+  display: flex;
+  flex-direction: column;
+}
+
+.stack-frame {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  transition: background var(--transition);
+}
+
+.stack-frame:hover {
+  background: var(--bg-hover);
+}
+
+.stack-frame.current {
+  border-left-color: var(--accent);
+  background: var(--bg-active);
+  font-weight: 600;
+}
+
+.stack-depth {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg-muted);
+  min-width: 18px;
+}
+
+.stack-name {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.stack-loc {
+  font-size: 10px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Description panel in narrative tab */
+.walk-description {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.walk-description .desc-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--fg-muted);
+  margin-bottom: 6px;
+}
+
+.walk-description .desc-text {
+  font-size: 12px;
+  color: var(--fg-secondary);
+  line-height: 1.6;
+}
+
+/* Tags */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.tag {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(86, 156, 214, 0.12);
+  color: var(--accent);
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.3); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.5); }
+
+/* ---- Status bar ---- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
+  background: #007acc;
+  color: #fff;
+  font-size: 11px;
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.statusbar .left { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.statusbar .right { text-align: right; white-space: nowrap; }
+
+/* ---- Keyboard shortcuts overlay ---- */
+.shortcuts-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+
+.shortcuts-overlay.visible {
+  display: flex;
+}
+
+.shortcuts-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px 32px;
+  max-width: 420px;
+  width: 100%;
+}
+
+.shortcuts-card h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg-bright);
+  margin-bottom: 16px;
+}
+
+.shortcuts-card .shortcut-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 12px;
+}
+
+.shortcuts-card kbd {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-bright);
+  min-width: 22px;
+  text-align: center;
+}
+
+.shortcuts-card .close-hint {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+/* ---- Responsive: hide sidebar on narrow screens ---- */
+@media (max-width: 900px) {
+  .cell-nav { display: none; }
+  .right-panel { width: 300px; }
+}
+
+@media (max-width: 600px) {
+  .right-panel { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- DROP ZONE — shown when no file is loaded                     -->
+<!-- ============================================================ -->
+<div id="drop-zone">
+  <div class="logo">&#x1F4DC;</div>
+  <h1>CodeWalk Viewer</h1>
+  <p>Interactive walkthrough viewer for <code>.codewalk.json</code> files.<br>
+     Supports both <strong>v1</strong> (single file) and <strong>v2</strong> (multi-file folder) formats.</p>
+  <div style="display:flex;gap:12px;align-items:center">
+    <button class="file-btn" id="browse-btn">Open .codewalk.json</button>
+    <button class="file-btn" id="browse-folder-btn" style="border-color:#4ec9b0;color:#4ec9b0">Open v2 Folder</button>
+  </div>
+  <span class="or">or</span>
+  <span class="drop-hint">Drag &amp; drop a file <em>or folder</em> anywhere on this page</span>
+  <div style="margin-top:8px;font-size:11px;color:#555;max-width:420px;text-align:center;line-height:1.6">
+    <strong>v1:</strong> single <code>.codewalk.json</code> file &nbsp;|&nbsp;
+    <strong>v2:</strong> folder with <code>manifest.codewalk.json</code> + <code>cell-*.json</code> files
+  </div>
+  <input type="file" id="file-input" accept=".json,.codewalk.json" hidden>
+  <input type="file" id="folder-input" webkitdirectory hidden>
+</div>
+
+<!-- ============================================================ -->
+<!-- MAIN VIEWER — shown after file loads                         -->
+<!-- ============================================================ -->
+<div id="viewer">
+  <!-- Top bar -->
+  <div class="topbar">
+    <span class="walk-name" id="walk-name"></span>
+    <span class="separator">&rsaquo;</span>
+    <span class="cell-badge" id="cell-badge"></span>
+    <span class="cell-counter" id="cell-counter"></span>
+    <div class="nav-group">
+      <button class="nav-btn" id="btn-prev" title="Previous cell (Left / k)">&#x25C0; Prev</button>
+      <input class="jump-input" id="jump-input" type="number" min="1" title="Jump to cell #">
+      <button class="nav-btn" id="btn-next" title="Next cell (Right / j)">Next &#x25B6;</button>
+    </div>
+    <button class="load-btn" id="load-another-btn" title="Open another file">Open...</button>
+  </div>
+
+  <!-- Main content -->
+  <div class="main-content">
+    <!-- Left: cell nav sidebar -->
+    <div class="cell-nav">
+      <div class="nav-header">Cells</div>
+      <div class="nav-list" id="cell-nav-list"></div>
+    </div>
+
+    <!-- Center: code panel -->
+    <div class="code-panel">
+      <div class="file-tab-bar">
+        <span class="file-icon">&#x1F4C4;</span>
+        <span class="file-path" id="file-path"></span>
+        <span class="line-range" id="line-range"></span>
+        <span class="confidence" id="confidence"></span>
+      </div>
+      <div class="steps-bar" id="steps-bar" style="display:none">
+        <span class="step-label">Step</span>
+        <button class="step-nav-btn" id="btn-step-prev" title="Previous step (Shift+Left)">&#x25C0;</button>
+        <span class="step-counter" id="step-counter"></span>
+        <button class="step-nav-btn" id="btn-step-next" title="Next step (Shift+Right)">&#x25B6;</button>
+        <div class="step-dots" id="step-dots"></div>
+      </div>
+      <div class="step-description" id="step-description" style="display:none"></div>
+      <div class="code-area" id="code-area"></div>
+    </div>
+
+    <!-- Right: tabbed panel -->
+    <div class="right-panel">
+      <div class="panel-tabs">
+        <div class="panel-tab active" data-tab="narrative">Narrative</div>
+        <div class="panel-tab" data-tab="variables">Variables</div>
+        <div class="panel-tab" data-tab="callstack">Call Stack</div>
+      </div>
+      <div class="panel-body" id="panel-body"></div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="statusbar">
+    <span class="left" id="status-left"></span>
+    <span class="right" id="status-right">? for keyboard shortcuts</span>
+  </div>
+</div>
+
+<!-- Keyboard shortcuts overlay -->
+<div class="shortcuts-overlay" id="shortcuts-overlay">
+  <div class="shortcuts-card">
+    <h2>Keyboard Shortcuts</h2>
+    <div class="shortcut-row"><span>Next cell</span><span><kbd>&rarr;</kbd> or <kbd>j</kbd></span></div>
+    <div class="shortcut-row"><span>Previous cell</span><span><kbd>&larr;</kbd> or <kbd>k</kbd></span></div>
+    <div class="shortcut-row"><span>Next/prev sub-step</span><span><kbd>&rarr;</kbd>/<kbd>&larr;</kbd> (within cell)</span></div>
+    <div class="shortcut-row"><span>First cell</span><span><kbd>Home</kbd></span></div>
+    <div class="shortcut-row"><span>Last cell</span><span><kbd>End</kbd></span></div>
+    <div class="shortcut-row"><span>Jump to cell #</span><span><kbd>g</kbd> then type number</span></div>
+    <div class="shortcut-row"><span>Narrative tab</span><span><kbd>1</kbd></span></div>
+    <div class="shortcut-row"><span>Variables tab</span><span><kbd>2</kbd></span></div>
+    <div class="shortcut-row"><span>Call Stack tab</span><span><kbd>3</kbd></span></div>
+    <div class="shortcut-row"><span>Show shortcuts</span><span><kbd>?</kbd></span></div>
+    <div class="shortcut-row"><span>Open file</span><span><kbd>o</kbd></span></div>
+    <div class="close-hint">Press <kbd>Esc</kbd> or <kbd>?</kbd> to close</div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   CodeWalk Viewer — Application Logic
+   ========================================================================= */
+
+(() => {
+  'use strict';
+
+  // ---- State ----
+  let walk = null;       // CodeWalk object
+  let cells = [];        // walk.cells
+  let activeIndex = 0;   // currently displayed cell index
+  let activeTab = 'narrative';
+  let activeStepIndex = -1; // current sub-step (-1 = no steps / show all)
+
+  // ---- DOM refs ----
+  const $dropZone = document.getElementById('drop-zone');
+  const $viewer = document.getElementById('viewer');
+  const $fileInput = document.getElementById('file-input');
+  const $folderInput = document.getElementById('folder-input');
+  const $browseBtn = document.getElementById('browse-btn');
+  const $browseFolderBtn = document.getElementById('browse-folder-btn');
+  const $loadAnotherBtn = document.getElementById('load-another-btn');
+  const $walkName = document.getElementById('walk-name');
+  const $cellBadge = document.getElementById('cell-badge');
+  const $cellCounter = document.getElementById('cell-counter');
+  const $btnPrev = document.getElementById('btn-prev');
+  const $btnNext = document.getElementById('btn-next');
+  const $jumpInput = document.getElementById('jump-input');
+  const $cellNavList = document.getElementById('cell-nav-list');
+  const $filePath = document.getElementById('file-path');
+  const $lineRange = document.getElementById('line-range');
+  const $confidence = document.getElementById('confidence');
+  const $codeArea = document.getElementById('code-area');
+  const $panelBody = document.getElementById('panel-body');
+  const $statusLeft = document.getElementById('status-left');
+  const $statusRight = document.getElementById('status-right');
+  const $shortcutsOverlay = document.getElementById('shortcuts-overlay');
+  const $panelTabs = document.querySelectorAll('.panel-tab');
+  const $stepsBar = document.getElementById('steps-bar');
+  const $stepCounter = document.getElementById('step-counter');
+  const $stepDots = document.getElementById('step-dots');
+  const $stepDescription = document.getElementById('step-description');
+  const $btnStepPrev = document.getElementById('btn-step-prev');
+  const $btnStepNext = document.getElementById('btn-step-next');
+
+  // ---- Helpers ----
+  function esc(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  /** Render markdown-lite: **bold**, `code`, numbered lists */
+  function renderMarkdown(text) {
+    if (!text) return '';
+    let html = esc(text);
+    // Bold
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    return html;
+  }
+
+  // ---- Cell type config ----
+  const CELL_TYPE_CONFIG = {
+    entry:      { icon: '\u25B6', label: 'Entry',      color: '#569cd6', bg: 'rgba(86,156,214,0.15)' },
+    call:       { icon: '\u2192', label: 'Call',        color: '#4ec9b0', bg: 'rgba(78,201,176,0.15)' },
+    branch:     { icon: '?',     label: 'Branch',      color: '#ce9178', bg: 'rgba(206,145,120,0.15)' },
+    assignment: { icon: '=',     label: 'Assignment',   color: '#dcdcaa', bg: 'rgba(220,220,170,0.15)' },
+    return:     { icon: '\u2190', label: 'Return',      color: '#b5cea8', bg: 'rgba(181,206,168,0.15)' },
+    dispatch:   { icon: '\u27BF', label: 'Dispatch',    color: '#c586c0', bg: 'rgba(197,134,192,0.15)' },
+    block:      { icon: '\u25AA', label: 'Block',       color: '#d4d4d4', bg: 'rgba(212,212,212,0.1)' },
+    note:       { icon: '\u270E', label: 'Note',        color: '#78909c', bg: 'rgba(120,144,156,0.15)' },
+  };
+
+  const ACTION_ICONS = {
+    created: '\uD83C\uDD95',   // 🆕
+    modified: '\u270F\uFE0F',  // ✏️
+    read: '\uD83D\uDC41',     // 👁
+    unchanged: '',
+  };
+
+  // ---- C++ syntax colorizer (regex, good enough for display) ----
+  const CPP_KEYWORDS = new Set([
+    'void','int','bool','char','unsigned','signed','long','short','float','double',
+    'const','static','virtual','override','class','struct','enum','namespace','using',
+    'typedef','typename','template','public','private','protected','return','if','else',
+    'for','while','do','switch','case','break','continue','default','new','delete',
+    'nullptr','true','false','this','auto','constexpr','inline','explicit','noexcept',
+    'mutable','volatile','register','extern','sizeof','decltype','co_await','co_return',
+    'HRESULT','DWORD','BOOL','UINT','ULONG','SIZE_T','HGLOBAL',
+    'STGMEDIUM','FORMATETC','IStream','IDataObject','POINT','POINTL',
+    'S_OK','E_NOTIMPL','DV_E_FORMATETC','SUCCEEDED','FAILED',
+    'DCHECK','CHECK','NOTREACHED','IFACEMETHODIMP',
+    'std','base','gfx','ui','aura','blink','content',
+  ]);
+
+  function colorize(text) {
+    let html = esc(text);
+
+    // Comments (// ...)
+    html = html.replace(/(\/\/.*?)$/gm,
+      '<span style="color:#6a9955">$1</span>');
+
+    // Strings
+    html = html.replace(/(&quot;.*?&quot;)/g,
+      '<span style="color:#ce9178">$1</span>');
+
+    // Numbers
+    html = html.replace(/\b(\d+)\b/g,
+      '<span style="color:#b5cea8">$1</span>');
+
+    // Preprocessor
+    html = html.replace(/^(\s*#\w+)/gm,
+      '<span style="color:#c586c0">$1</span>');
+
+    // Namespace/class qualifiers
+    html = html.replace(/\b([A-Z]\w+)(::)/g,
+      '<span style="color:#4ec9b0">$1</span>$2');
+
+    // Keywords
+    for (const kw of CPP_KEYWORDS) {
+      const re = new RegExp(`\\b(${kw})\\b`, 'g');
+      html = html.replace(re, '<span style="color:#569cd6">$1</span>');
+    }
+
+    // -> operator
+    html = html.replace(/(-&gt;)/g, '<span style="color:#d4d4d4">$1</span>');
+
+    return html;
+  }
+
+  // ---- File loading ----
+
+  /**
+   * Load a fully assembled CodeWalk object into the viewer.
+   */
+  function loadWalkData(data) {
+    // Support v1 ({_format: 'codegraph-codewalk-v1', walk}),
+    // raw walk with cells, or already-assembled walk
+    if (data._format === 'codegraph-codewalk-v1' && data.walk) {
+      walk = data.walk;
+    } else if (data._format === 'codegraph-codewalk-v2' && data.walk) {
+      // v2 manifest without cells — shouldn't reach here directly,
+      // but handle gracefully
+      alert('This is a v2 manifest file. Please open the entire folder instead.\n\nUse "Open v2 Folder" or drag the folder onto the page.');
+      return;
+    } else if (data.walk && data.walk.cells) {
+      walk = data.walk;
+    } else if (data.cells) {
+      walk = data;
+    } else {
+      alert('Unrecognized format. Expected:\n• v1: a .codewalk.json file with "walk.cells"\n• v2: a folder with manifest.codewalk.json + cell-*.json files');
+      return;
+    }
+
+    cells = walk.cells || [];
+    if (cells.length === 0) {
+      alert('This code walk has no cells.');
+      return;
+    }
+
+    activeIndex = 0;
+    activeStepIndex = (cells[0].steps && cells[0].steps.length > 0) ? 0 : -1;
+    $dropZone.style.display = 'none';
+    $viewer.classList.add('active');
+    $walkName.textContent = walk.name || walk.id || 'Untitled Walk';
+    $jumpInput.max = cells.length;
+
+    buildCellNav();
+    renderCell();
+    updateStatusBar();
+  }
+
+  /**
+   * Handle a single v1 .codewalk.json file.
+   */
+  function handleFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        loadWalkData(data);
+      } catch (err) {
+        alert('Failed to parse JSON: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // -----------------------------------------------------------------------
+  // V2 Multi-File Format Support
+  //
+  // V2 layout on disk:
+  //   <walk-id>/
+  //     manifest.codewalk.json   ← {_format: 'codegraph-codewalk-v2', walk: {id, name, cellIds, meta}}
+  //     cell-0.json              ← {_format: 'codegraph-cell-v1', walkId, cell: WalkCell}
+  //     cell-1.json
+  //     ...
+  //
+  // We assemble the full CodeWalk from the manifest + cell files.
+  // -----------------------------------------------------------------------
+
+  /**
+   * Handle a folder of files (from <input webkitdirectory> or drag-drop).
+   * Looks for manifest.codewalk.json, reads cell files, assembles the walk.
+   *
+   * @param {File[]} fileList - Array of File objects from the folder
+   */
+  async function handleFolderFiles(fileList) {
+    // Build a map of filename → File for quick lookup
+    const fileMap = new Map();
+    for (const f of fileList) {
+      // f.name is just the filename; f.webkitRelativePath has the full relative path
+      const name = f.name;
+      fileMap.set(name, f);
+    }
+
+    // Find the manifest
+    let manifestFile = fileMap.get('manifest.codewalk.json');
+
+    // If not found at top level, search by relative path (the folder input
+    // may include the parent directory name in webkitRelativePath)
+    if (!manifestFile) {
+      for (const f of fileList) {
+        if (f.name === 'manifest.codewalk.json' ||
+            f.webkitRelativePath?.endsWith('/manifest.codewalk.json')) {
+          manifestFile = f;
+          break;
+        }
+      }
+    }
+
+    // If still no manifest, check if any file is a v1 codewalk
+    if (!manifestFile) {
+      // Maybe they dropped a v2 folder but it has a v1 file too, or
+      // maybe they just dropped a single file into the folder picker
+      const jsonFiles = fileList.filter(f => f.name.endsWith('.codewalk.json') && f.name !== 'manifest.codewalk.json');
+      if (jsonFiles.length === 1) {
+        handleFile(jsonFiles[0]);
+        return;
+      }
+
+      alert('No manifest.codewalk.json found in the folder.\n\nExpected v2 layout:\n  manifest.codewalk.json\n  cell-0.json\n  cell-1.json\n  ...');
+      return;
+    }
+
+    try {
+      // Parse manifest
+      const manifestText = await readFileAsText(manifestFile);
+      const manifest = JSON.parse(manifestText);
+
+      if (manifest._format !== 'codegraph-codewalk-v2' || !manifest.walk) {
+        alert('Invalid manifest format. Expected _format: "codegraph-codewalk-v2".');
+        return;
+      }
+
+      const walkMeta = manifest.walk;
+      const cellIds = walkMeta.cellIds || [];
+
+      if (cellIds.length === 0) {
+        alert('Manifest has no cellIds listed.');
+        return;
+      }
+
+      // Load cells in the order specified by cellIds
+      const loadedCells = [];
+      const loadedCellIds = new Set();
+      const errors = [];
+
+      for (const cellId of cellIds) {
+        const cellFileName = cellId + '.json';
+        let cellFile = fileMap.get(cellFileName);
+
+        // Search by relative path if not found by name
+        if (!cellFile) {
+          for (const f of fileList) {
+            if (f.name === cellFileName ||
+                f.webkitRelativePath?.endsWith('/' + cellFileName)) {
+              cellFile = f;
+              break;
+            }
+          }
+        }
+
+        if (!cellFile) {
+          errors.push(`Cell file not found: ${cellFileName}`);
+          continue;
+        }
+
+        try {
+          const cellText = await readFileAsText(cellFile);
+          const cellData = JSON.parse(cellText);
+
+          // Support both {_format: 'codegraph-cell-v1', cell: ...} and raw {cell: ...}
+          const cell = cellData.cell || cellData;
+          if (cell && cell.id) {
+            loadedCells.push(cell);
+            loadedCellIds.add(cell.id);
+          } else {
+            errors.push(`Invalid cell file (no cell.id): ${cellFileName}`);
+          }
+        } catch (cellErr) {
+          errors.push(`Failed to parse ${cellFileName}: ${cellErr.message}`);
+        }
+      }
+
+      // Also pick up any extra cell files NOT in cellIds
+      for (const f of fileList) {
+        if (f.name === 'manifest.codewalk.json' || !f.name.endsWith('.json')) continue;
+        const cellId = f.name.replace('.json', '');
+        if (loadedCellIds.has(cellId)) continue;
+
+        try {
+          const cellText = await readFileAsText(f);
+          const cellData = JSON.parse(cellText);
+          const cell = cellData.cell || cellData;
+          if (cell && cell.id && !loadedCellIds.has(cell.id)) {
+            loadedCells.push(cell);
+            loadedCellIds.add(cell.id);
+          }
+        } catch {
+          // Skip unparseable extra files
+        }
+      }
+
+      // Sort by index
+      loadedCells.sort((a, b) => (a.index || 0) - (b.index || 0));
+
+      if (loadedCells.length === 0) {
+        alert('No valid cell files found.\n\n' + errors.join('\n'));
+        return;
+      }
+
+      if (errors.length > 0) {
+        console.warn('CodeWalk Viewer: some cell files had issues:', errors);
+      }
+
+      // Assemble the full CodeWalk
+      const assembledWalk = {
+        id: walkMeta.id,
+        name: walkMeta.name,
+        description: walkMeta.description || '',
+        scenarioId: walkMeta.scenarioId,
+        cells: loadedCells,
+        meta: walkMeta.meta || { contributors: [], createdAt: '', updatedAt: '', tags: [] },
+      };
+
+      // Load it
+      loadWalkData({ _format: 'codegraph-codewalk-v1', walk: assembledWalk });
+
+      // Show format info in status bar
+      $statusRight.textContent = `v2 multi-file (${loadedCells.length} cells)  |  ? for shortcuts`;
+
+    } catch (err) {
+      alert('Failed to load v2 codewalk folder: ' + err.message);
+    }
+  }
+
+  /**
+   * Read a File object as text (Promise wrapper).
+   */
+  function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+  }
+
+  /**
+   * Handle a drag-drop that might be a folder.
+   * Uses DataTransferItem.webkitGetAsEntry() to traverse directory contents.
+   */
+  async function handleDrop(dataTransfer) {
+    const items = dataTransfer.items;
+    const files = dataTransfer.files;
+
+    // Try to detect if a folder was dropped using webkitGetAsEntry
+    if (items && items.length > 0) {
+      const firstItem = items[0];
+      if (firstItem.webkitGetAsEntry) {
+        const entry = firstItem.webkitGetAsEntry();
+        if (entry && entry.isDirectory) {
+          // It's a folder drop — traverse and collect all files
+          const allFiles = await traverseDirectory(entry);
+          await handleFolderFiles(allFiles);
+          return;
+        }
+      }
+    }
+
+    // Single file drop
+    if (files.length === 1) {
+      handleFile(files[0]);
+    } else if (files.length > 1) {
+      // Multiple files dropped — treat as v2 folder contents
+      await handleFolderFiles(Array.from(files));
+    }
+  }
+
+  /**
+   * Recursively traverse a dropped directory and return all File objects.
+   */
+  async function traverseDirectory(dirEntry) {
+    const files = [];
+
+    async function readDir(entry, path) {
+      if (entry.isFile) {
+        const file = await new Promise((resolve, reject) => {
+          entry.file(resolve, reject);
+        });
+        files.push(file);
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const entries = await new Promise((resolve, reject) => {
+          const allEntries = [];
+          function readBatch() {
+            reader.readEntries((batch) => {
+              if (batch.length === 0) {
+                resolve(allEntries);
+              } else {
+                allEntries.push(...batch);
+                readBatch(); // Keep reading until empty batch
+              }
+            }, reject);
+          }
+          readBatch();
+        });
+
+        for (const childEntry of entries) {
+          await readDir(childEntry, path + '/' + childEntry.name);
+        }
+      }
+    }
+
+    await readDir(dirEntry, dirEntry.name);
+    return files;
+  }
+
+  // ---- Cell navigation sidebar ----
+  function buildCellNav() {
+    let html = '';
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      const cfg = CELL_TYPE_CONFIG[cell.type] || CELL_TYPE_CONFIG.block;
+      const indent = '\u00A0\u00A0'.repeat(cell.stackDepth || 0);
+      const label = getCellLabel(cell);
+      const isActive = i === activeIndex;
+
+      html += `<div class="nav-item ${isActive ? 'active' : ''}" data-index="${i}">
+        <span class="indent">${indent}</span>
+        <span class="icon" style="color:${cfg.color}">${cfg.icon}</span>
+        <span class="label">${esc(label)}</span>
+        <span class="status-dot ${cell.status || 'skeleton'}"></span>
+      </div>`;
+    }
+    $cellNavList.innerHTML = html;
+
+    // Click handlers
+    $cellNavList.querySelectorAll('.nav-item').forEach(el => {
+      el.addEventListener('click', () => {
+        goToCell(parseInt(el.dataset.index, 10));
+      });
+    });
+  }
+
+  function getCellLabel(cell) {
+    const stack = cell.callStack;
+    const func = stack && stack.length > 0
+      ? stack[stack.length - 1].functionName
+      : '';
+    const shortFunc = func ? func.split('::').pop() : '';
+
+    switch (cell.type) {
+      case 'entry': return shortFunc || 'Entry';
+      case 'call': return '\u2192 ' + (shortFunc || 'Call');
+      case 'branch': return '? Branch';
+      case 'assignment': return '= Assign';
+      case 'return': return '\u2190 Return';
+      case 'dispatch': return '\u27BF ' + (shortFunc || 'Dispatch');
+      case 'block': return '\u25AA Block';
+      case 'note': return '\u270E Note';
+      default: return cell.type;
+    }
+  }
+
+  function updateCellNavHighlight() {
+    const items = $cellNavList.querySelectorAll('.nav-item');
+    items.forEach((el, i) => {
+      el.classList.toggle('active', i === activeIndex);
+    });
+
+    // Scroll active into view
+    const activeEl = items[activeIndex];
+    if (activeEl) {
+      activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  // ---- Render active cell ----
+  function renderCell() {
+    const cell = cells[activeIndex];
+    if (!cell) return;
+
+    const cfg = CELL_TYPE_CONFIG[cell.type] || CELL_TYPE_CONFIG.block;
+
+    // Top bar badge
+    $cellBadge.textContent = cfg.label;
+    $cellBadge.style.color = cfg.color;
+    $cellBadge.style.background = cfg.bg;
+
+    // Counter
+    $cellCounter.textContent = `${activeIndex + 1} / ${cells.length}`;
+
+    // Nav buttons
+    $btnPrev.disabled = activeIndex === 0;
+    $btnNext.disabled = activeIndex === cells.length - 1;
+
+    // File tab
+    $filePath.textContent = cell.code.filePath || '';
+    $lineRange.textContent = cell.code.startLine && cell.code.endLine
+      ? `L${cell.code.startLine}\u2013${cell.code.endLine}`
+      : '';
+
+    // Confidence
+    if (cell.confidence !== undefined) {
+      const pct = (cell.confidence * 100).toFixed(0);
+      const cls = cell.confidence >= 0.8 ? 'high' : cell.confidence >= 0.5 ? 'mid' : 'low';
+      $confidence.textContent = pct + '%';
+      $confidence.className = 'confidence ' + cls;
+      $confidence.style.display = '';
+    } else {
+      $confidence.style.display = 'none';
+    }
+
+    // Code
+    renderCode(cell);
+
+    // Sub-steps bar
+    renderStepsBar(cell);
+
+    // Side panel
+    renderPanel(cell);
+
+    // Nav sidebar highlight
+    updateCellNavHighlight();
+
+    // Status bar
+    updateStatusBar();
+  }
+
+  function renderCode(cell) {
+    const code = cell.code;
+    if (!code.text) {
+      $codeArea.innerHTML = '<div style="padding:24px;color:#666">No source code for this cell.</div>';
+      return;
+    }
+
+    const lines = code.text.split('\n');
+    const hlMap = new Map();
+    if (code.highlights) {
+      for (const hl of code.highlights) {
+        hlMap.set(hl.line, hl);
+      }
+    }
+
+    // Determine sub-step focus line(s)
+    const hasSteps = cell.steps && cell.steps.length > 0 && activeStepIndex >= 0;
+    let focusStart = -1;
+    let focusEnd = -1;
+    if (hasSteps) {
+      const step = cell.steps[activeStepIndex];
+      focusStart = step.focusLine;
+      focusEnd = step.focusEndLine || step.focusLine;
+    }
+
+    let html = '';
+    for (let i = 0; i < lines.length; i++) {
+      const lineNum = code.startLine + i;
+      const hl = hlMap.get(lineNum);
+
+      let hlClass = '';
+      if (hasSteps) {
+        // In sub-step mode: focused line gets strong highlight, rest gets cell-range
+        if (lineNum >= focusStart && lineNum <= focusEnd) {
+          hlClass = 'hl-focus';
+        } else {
+          hlClass = 'hl-cell-range';
+        }
+      } else {
+        // Normal mode: use line highlights
+        hlClass = hl ? 'hl-' + hl.type : '';
+      }
+
+      const annotation = hl && hl.annotation
+        ? `<span class="line-annotation">// ${esc(hl.annotation)}</span>`
+        : '';
+
+      html += `<div class="code-line ${hlClass}">` +
+        `<span class="line-gutter">${lineNum}</span>` +
+        `<span class="line-content">${colorize(lines[i])}${annotation}</span>` +
+        `</div>\n`;
+    }
+
+    $codeArea.innerHTML = html;
+
+    // Scroll focused line into view
+    if (hasSteps) {
+      const focusEl = $codeArea.querySelector('.hl-focus');
+      if (focusEl) focusEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } else {
+      const firstHl = $codeArea.querySelector('.hl-executed, .hl-called, .hl-branched, .hl-assigned');
+      if (firstHl) firstHl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+
+  function renderStepsBar(cell) {
+    const hasSteps = cell.steps && cell.steps.length > 0;
+    if (!hasSteps) {
+      $stepsBar.style.display = 'none';
+      $stepDescription.style.display = 'none';
+      return;
+    }
+
+    $stepsBar.style.display = 'flex';
+    $stepCounter.textContent = `${activeStepIndex + 1} / ${cell.steps.length}`;
+    $btnStepPrev.disabled = activeStepIndex === 0;
+    $btnStepNext.disabled = activeStepIndex === cell.steps.length - 1;
+
+    // Dots
+    let dotsHtml = '';
+    for (let i = 0; i < cell.steps.length; i++) {
+      const cls = i === activeStepIndex ? 'active' : (i < activeStepIndex ? 'visited' : '');
+      dotsHtml += `<div class="step-dot ${cls}" data-step="${i}"></div>`;
+    }
+    $stepDots.innerHTML = dotsHtml;
+    $stepDots.querySelectorAll('.step-dot').forEach(el => {
+      el.addEventListener('click', () => goToStep(parseInt(el.dataset.step, 10)));
+    });
+
+    // Step description
+    const step = cell.steps[activeStepIndex];
+    if (step && step.description) {
+      $stepDescription.style.display = 'block';
+      $stepDescription.innerHTML = renderMarkdown(step.description);
+    } else {
+      $stepDescription.style.display = 'none';
+    }
+  }
+
+  // ---- Right panel rendering ----
+  function renderPanel(cell) {
+    switch (activeTab) {
+      case 'narrative':
+        renderNarrativeTab(cell);
+        break;
+      case 'variables':
+        renderVariablesTab(cell);
+        break;
+      case 'callstack':
+        renderCallStackTab(cell);
+        break;
+    }
+  }
+
+  function renderNarrativeTab(cell) {
+    let html = '';
+
+    // In sub-step mode, show only the current step's description prominently
+    const hasSteps = cell.steps && cell.steps.length > 0 && activeStepIndex >= 0;
+    if (hasSteps) {
+      const step = cell.steps[activeStepIndex];
+      html += `<div class="narrative-text"><strong>Step ${activeStepIndex + 1}:</strong> ${renderMarkdown(step.description)}</div>`;
+      // Show full narrative below as context (dimmed)
+      if (cell.narrative) {
+        html += `<div style="margin-top:12px;opacity:0.5;font-size:11px;border-top:1px solid rgba(128,128,128,0.2);padding-top:8px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-muted);margin-bottom:4px">Full Narrative</div>
+          <div class="narrative-text" style="font-size:11px">${renderMarkdown(cell.narrative)}</div>
+        </div>`;
+      }
+    } else if (cell.narrative) {
+      html += `<div class="narrative-text">${renderMarkdown(cell.narrative)}</div>`;
+    } else {
+      html += '<div style="color:#666;font-size:12px">No narrative for this cell.</div>';
+    }
+
+    // Walk description (only on first cell or note cells)
+    if (walk.description && (activeIndex === 0 || cell.type === 'note')) {
+      html += `<div class="walk-description">
+        <div class="desc-label">Walk Description</div>
+        <div class="desc-text">${esc(walk.description)}</div>
+      </div>`;
+    }
+
+    // Tags
+    if (walk.meta && walk.meta.tags && walk.meta.tags.length > 0 && activeIndex === 0) {
+      html += '<div class="tags">';
+      for (const tag of walk.meta.tags) {
+        html += `<span class="tag">${esc(tag)}</span>`;
+      }
+      html += '</div>';
+    }
+
+    $panelBody.innerHTML = html;
+  }
+
+  function renderVariablesTab(cell) {
+    if (!cell.state || !cell.state.scopes || cell.state.scopes.length === 0) {
+      $panelBody.innerHTML = '<div style="color:#666;font-size:12px;text-align:center;padding:24px">No variable data for this cell.</div>';
+      return;
+    }
+
+    let html = '';
+
+    for (const scope of cell.state.scopes) {
+      html += `<div class="scope-group">`;
+      html += `<div class="scope-name">${esc(scope.name)}</div>`;
+
+      for (const [name, v] of Object.entries(scope.variables)) {
+        const actionIcon = ACTION_ICONS[v.action] || '';
+        const changedClass = v.changed ? 'changed' : '';
+        const typeHtml = v.type
+          ? `<span class="var-type">${esc(v.type)}</span>`
+          : '';
+
+        html += `<div class="var-row ${changedClass}">
+          <span class="var-action">${actionIcon}</span>
+          <span class="var-name">${esc(name)}</span>
+          ${typeHtml}
+          <span class="var-value">${esc(v.value)}</span>`;
+
+        if (v.rationale) {
+          html += `<div class="var-rationale">${esc(v.rationale)}</div>`;
+        }
+
+        html += `</div>`;
+      }
+
+      html += `</div>`;
+    }
+
+    // Changes summary
+    if (cell.state.changes && cell.state.changes.length > 0) {
+      html += `<div class="changes-summary">
+        <div class="changes-label">Changes</div>`;
+      for (const c of cell.state.changes) {
+        html += `<div class="change-item">${esc(c)}</div>`;
+      }
+      html += `</div>`;
+    }
+
+    $panelBody.innerHTML = html;
+  }
+
+  function renderCallStackTab(cell) {
+    if (!cell.callStack || cell.callStack.length === 0) {
+      $panelBody.innerHTML = '<div style="color:#666;font-size:12px;text-align:center;padding:24px">No call stack for this cell.</div>';
+      return;
+    }
+
+    // Show most-recent first (reverse)
+    const frames = [...cell.callStack].reverse();
+    let html = '<div class="stack-frames">';
+
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i];
+      const isTop = i === 0;
+      const fileName = frame.filePath.split('/').pop() || frame.filePath;
+      const arrow = isTop ? '\u2192' : '\u00A0';
+
+      // Check if clicking should navigate to a cell
+      const cellId = frame.cellId || '';
+      const dataAttr = cellId ? `data-cell-id="${esc(cellId)}"` : '';
+
+      html += `<div class="stack-frame ${isTop ? 'current' : ''}" ${dataAttr}>
+        <span class="stack-depth">${arrow}#${frame.depth}</span>
+        <span class="stack-name">${esc(frame.functionName)}</span>
+        <span class="stack-loc">${esc(fileName)}:${frame.line}</span>
+      </div>`;
+    }
+
+    html += '</div>';
+    $panelBody.innerHTML = html;
+
+    // Click handlers for navigating to cell
+    $panelBody.querySelectorAll('.stack-frame[data-cell-id]').forEach(el => {
+      el.addEventListener('click', () => {
+        const cellId = el.dataset.cellId;
+        const idx = cells.findIndex(c => c.id === cellId);
+        if (idx >= 0) goToCell(idx);
+      });
+    });
+  }
+
+  function updateStatusBar() {
+    if (!walk) return;
+    const cell = cells[activeIndex];
+    if (cell) {
+      $statusLeft.textContent = `${cell.code.filePath || ''}  :  ${cell.code.startLine || ''}`;
+    }
+    $statusRight.textContent = `${walk.name || walk.id}  |  ? for shortcuts`;
+  }
+
+  // ---- Navigation ----
+  function goToCell(index) {
+    if (index < 0 || index >= cells.length) return;
+    activeIndex = index;
+    // Reset to first sub-step if cell has steps, else -1
+    const cell = cells[index];
+    activeStepIndex = (cell.steps && cell.steps.length > 0) ? 0 : -1;
+    renderCell();
+  }
+
+  function nextCell() {
+    const cell = cells[activeIndex];
+    // If cell has sub-steps and we haven't finished them, advance step
+    if (cell && cell.steps && cell.steps.length > 0 && activeStepIndex < cell.steps.length - 1) {
+      activeStepIndex++;
+      renderCell();
+      return;
+    }
+    if (activeIndex < cells.length - 1) goToCell(activeIndex + 1);
+  }
+
+  function prevCell() {
+    const cell = cells[activeIndex];
+    // If cell has sub-steps and we're not on the first, go back a step
+    if (cell && cell.steps && cell.steps.length > 0 && activeStepIndex > 0) {
+      activeStepIndex--;
+      renderCell();
+      return;
+    }
+    if (activeIndex > 0) goToCell(activeIndex - 1);
+  }
+
+  // Direct sub-step navigation (skips cell boundary logic)
+  function goToStep(stepIndex) {
+    const cell = cells[activeIndex];
+    if (!cell || !cell.steps || stepIndex < 0 || stepIndex >= cell.steps.length) return;
+    activeStepIndex = stepIndex;
+    renderCell();
+  }
+
+  // ---- Tab switching ----
+  function switchTab(tab) {
+    activeTab = tab;
+    $panelTabs.forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === tab);
+    });
+
+    // Update counts on variables/callstack tabs
+    const cell = cells[activeIndex];
+    if (cell) renderPanel(cell);
+  }
+
+  // ---- Event listeners ----
+
+  // File browse (v1 single file)
+  $browseBtn.addEventListener('click', () => $fileInput.click());
+  $loadAnotherBtn.addEventListener('click', () => $fileInput.click());
+  $fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  // Folder browse (v2 multi-file)
+  $browseFolderBtn.addEventListener('click', () => $folderInput.click());
+  $folderInput.addEventListener('change', async (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      await handleFolderFiles(Array.from(e.target.files));
+    }
+  });
+
+  // Drag & drop (supports both files and folders)
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    $dropZone.classList.add('drag-over');
+  });
+  document.addEventListener('dragleave', () => {
+    $dropZone.classList.remove('drag-over');
+  });
+  document.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    $dropZone.classList.remove('drag-over');
+    await handleDrop(e.dataTransfer);
+  });
+
+  // Navigation buttons
+  $btnPrev.addEventListener('click', prevCell);
+  $btnNext.addEventListener('click', nextCell);
+  $btnStepPrev.addEventListener('click', () => {
+    if (activeStepIndex > 0) { activeStepIndex--; renderCell(); }
+  });
+  $btnStepNext.addEventListener('click', () => {
+    const cell = cells[activeIndex];
+    if (cell && cell.steps && activeStepIndex < cell.steps.length - 1) { activeStepIndex++; renderCell(); }
+  });
+
+  // Jump input
+  $jumpInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const val = parseInt($jumpInput.value, 10);
+      if (!isNaN(val) && val >= 1 && val <= cells.length) {
+        goToCell(val - 1);
+      }
+      $jumpInput.value = '';
+      $jumpInput.blur();
+    }
+  });
+
+  // Panel tabs
+  $panelTabs.forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+  });
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    // Ignore if typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    // Shortcuts overlay
+    if (e.key === '?') {
+      $shortcutsOverlay.classList.toggle('visible');
+      return;
+    }
+    if (e.key === 'Escape') {
+      $shortcutsOverlay.classList.remove('visible');
+      return;
+    }
+
+    if (!walk) return;
+
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'j':
+        nextCell();
+        e.preventDefault();
+        break;
+      case 'ArrowLeft':
+      case 'k':
+        prevCell();
+        e.preventDefault();
+        break;
+      case 'Home':
+        goToCell(0);
+        e.preventDefault();
+        break;
+      case 'End':
+        goToCell(cells.length - 1);
+        e.preventDefault();
+        break;
+      case '1':
+        switchTab('narrative');
+        break;
+      case '2':
+        switchTab('variables');
+        break;
+      case '3':
+        switchTab('callstack');
+        break;
+      case 'g':
+        $jumpInput.focus();
+        $jumpInput.value = '';
+        e.preventDefault();
+        break;
+      case 'o':
+        $fileInput.click();
+        e.preventDefault();
+        break;
+    }
+  });
+
+  // Close shortcuts on click outside
+  $shortcutsOverlay.addEventListener('click', (e) => {
+    if (e.target === $shortcutsOverlay) {
+      $shortcutsOverlay.classList.remove('visible');
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

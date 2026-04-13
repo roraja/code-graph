@@ -1,0 +1,69 @@
+{
+  "_format": "codegraph-cell-v1",
+  "walkId": "image-processor-process",
+  "cell": {
+    "id": "cell-1",
+    "index": 1,
+    "type": "call",
+    "code": {
+      "filePath": "src/processors.ts",
+      "startLine": 23,
+      "endLine": 25,
+      "text": "  supports(mimeType: string): boolean {\n    return this.supportedTypes.includes(mimeType);\n  }",
+      "highlights": [
+        { "line": 23, "type": "executed", "annotation": "supports() called with 'image/jpeg'" },
+        { "line": 24, "type": "executed", "annotation": "Array.includes → true" }
+      ]
+    },
+    "narrative": "The supports() method checks whether the given MIME type exists in the supportedTypes array. Since 'image/jpeg' is in the list, Array.includes() returns true.",
+    "steps": [
+      {
+        "description": "Enter `supports()` with `mimeType = 'image/jpeg'`. This is a public method that callers can also use to check compatibility before calling `process()`.",
+        "focusLine": 23
+      },
+      {
+        "description": "`Array.includes()` searches `['image/png', 'image/jpeg', 'image/gif']` for `'image/jpeg'` — found at index 1, so it returns **true**.",
+        "focusLine": 24
+      }
+    ],
+    "state": {
+      "scopes": [
+        {
+          "name": "parameters",
+          "variables": {
+            "mimeType": {
+              "value": "'image/jpeg'",
+              "type": "string",
+              "changed": false,
+              "action": "read",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T12:00:00Z", "confidence": 0.95 }
+            }
+          }
+        },
+        {
+          "name": "return",
+          "variables": {
+            "result": {
+              "value": "true",
+              "type": "boolean",
+              "changed": true,
+              "action": "created",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T12:00:00Z", "confidence": 0.98 },
+              "rationale": "'image/jpeg' is in the supportedTypes array"
+            }
+          }
+        }
+      ],
+      "changes": ["return: true"]
+    },
+    "stackDepth": 1,
+    "parentCellId": "cell-0",
+    "callStack": [
+      { "functionName": "ImageProcessor.process", "filePath": "src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" },
+      { "functionName": "ImageProcessor.supports", "filePath": "src/processors.ts", "line": 23, "depth": 1, "cellId": "cell-1" }
+    ],
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T12:00:00Z", "confidence": 0.98 },
+    "confidence": 0.98,
+    "status": "complete"
+  }
+}

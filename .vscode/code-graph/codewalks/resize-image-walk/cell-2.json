@@ -1,0 +1,59 @@
+{
+  "_format": "codegraph-cell-v1",
+  "walkId": "resize-image-walk",
+  "cell": {
+    "id": "cell-2",
+    "index": 2,
+    "type": "entry",
+    "code": {
+      "filePath": "test/fixtures/sample-project/src/processors.ts",
+      "startLine": 23,
+      "endLine": 25,
+      "text": "  supports(mimeType: string): boolean {\n    return this.supportedTypes.includes(mimeType);\n  }",
+      "highlights": [
+        { "line": 23, "type": "executed", "annotation": "Enter supports()" },
+        { "line": 24, "type": "returned", "annotation": "returns true — \"image/jpeg\" is in the list" }
+      ]
+    },
+    "narrative": "Inside supports(), the method checks whether \"image/jpeg\" is included in the supportedTypes array [\"image/png\", \"image/jpeg\", \"image/gif\"]. It is, so the method returns true. Back in process(), the negated condition (!true) is false, so we skip the early-return error block.",
+    "state": {
+      "scopes": [
+        {
+          "name": "parameters",
+          "variables": {
+            "mimeType": {
+              "value": "\"image/jpeg\"",
+              "type": "string",
+              "changed": false,
+              "action": "read",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 0.95 }
+            }
+          }
+        },
+        {
+          "name": "local",
+          "variables": {
+            "<return>": {
+              "value": "true",
+              "type": "boolean",
+              "changed": true,
+              "action": "created",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+              "rationale": "\"image/jpeg\" is the second element of supportedTypes"
+            }
+          }
+        }
+      ],
+      "changes": ["<return>: → true"]
+    },
+    "stackDepth": 1,
+    "parentCellId": "cell-1",
+    "callStack": [
+      { "functionName": "ImageProcessor.process", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" },
+      { "functionName": "ImageProcessor.supports", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 23, "depth": 1, "cellId": "cell-2" }
+    ],
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+    "confidence": 1.0,
+    "status": "complete"
+  }
+}

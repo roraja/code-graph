@@ -25,6 +25,7 @@ import {
   JustifierAgent,
   CorrectionInterpreterAgent,
   ScenarioFileReader,
+  CodeWalkFileReader,
   AIAgent,
   type ICodeParser,
   type AIProvider,
@@ -86,6 +87,8 @@ export interface ServerContext {
   scenarioEngine: ScenarioEngine;
   /** File-based scenario reader (reads from .vscode/code-graph/scenarios/). */
   scenarioFileReader: ScenarioFileReader;
+  /** File-based codewalk reader (reads from .vscode/code-graph/codewalks/). */
+  codeWalkFileReader: CodeWalkFileReader;
   /** Step-by-step scenario tracer. */
   scenarioTracer: ScenarioTracer;
   /** Human-correction processor. */
@@ -153,6 +156,9 @@ export async function createServerContext(
   const scenarioFileReader = new ScenarioFileReader(
     projectRoot ?? process.cwd(),
   );
+  const codeWalkFileReader = new CodeWalkFileReader(
+    projectRoot ?? process.cwd(),
+  );
   const scenarioTracer = new ScenarioTracer(
     parser,
     queryEngine,
@@ -181,6 +187,7 @@ export async function createServerContext(
     parser,
     scenarioEngine,
     scenarioFileReader,
+    codeWalkFileReader,
     scenarioTracer,
     correctionEngine,
     discoveryAgent,

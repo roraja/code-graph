@@ -90,6 +90,40 @@ export interface WalkCell {
 
   /** Corrections applied to this cell */
   corrections?: CellCorrection[];
+
+  /** Podcast-style dialogue segments with highlight cues for video generation */
+  podcast?: PodcastSegment[];
+
+  /**
+   * Sub-steps within this cell — sequential focus points that guide the
+   * viewer through the cell's code one concept at a time. When present,
+   * the viewer shows one step at a time instead of the full narrative,
+   * highlighting the focused line strongly while the overall cell range
+   * gets a lighter background.
+   */
+  steps?: CellStep[];
+}
+
+/** A sub-step within a cell — focuses on a single line/concept. */
+export interface CellStep {
+  /** Short description of what this line/concept does */
+  description: string;
+  /** The specific line number to strongly highlight (1-based, absolute in file) */
+  focusLine: number;
+  /** Optional end line for a multi-line focus range (1-based, inclusive) */
+  focusEndLine?: number;
+}
+
+/** A single dialogue segment in a podcast-style narration. */
+export interface PodcastSegment {
+  /** Speaker name (e.g., 'Sarah', 'Michael') */
+  speaker: string;
+  /** The dialogue text to be spoken */
+  text: string;
+  /** Line number to spotlight during this segment (null = no change / keep previous) */
+  spotlight?: number | null;
+  /** Range of lines to spotlight [start, end] (alternative to single line) */
+  spotlightRange?: [number, number];
 }
 
 /** Cell types — what kind of execution chunk */

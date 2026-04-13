@@ -26,6 +26,7 @@ const SKILL_NAMES = [
   'codegraph-codewalk-populate',
   'codegraph-codewalk-enrich',
   'codegraph-expand-scenario',
+  'codegraph-codewalk-podcast',
 ] as const;
 
 type SkillName = (typeof SKILL_NAMES)[number];

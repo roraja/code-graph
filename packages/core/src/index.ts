@@ -69,6 +69,8 @@ export type {
   DataSource,
   CodeLocation,
   CellCorrection,
+  PodcastSegment,
+  CellStep,
   CodeWalkFileData,
   CodeWalkManifest,
   CodeWalkCellFileData,

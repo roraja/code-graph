@@ -16,7 +16,7 @@
 
 import * as vscode from 'vscode';
 import { log, logEntry, logExit } from '../logger.js';
-import type { CodeWalk, WalkCell } from '@codegraph/core';
+import type { CodeWalk, WalkCell, CellStep } from '@codegraph/core';
 
 /**
  * Webview provider for the Code Walk Cells panel.
@@ -27,9 +27,10 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private currentWalk?: CodeWalk;
   private currentCellIndex = 0;
+  private currentStepIndex = -1; // -1 = no steps / show all
 
   /** Event fired when the current cell changes (for syncing editor highlights). */
-  private _onCellChanged = new vscode.EventEmitter<{ walk: CodeWalk; cell: WalkCell; index: number } | undefined>();
+  private _onCellChanged = new vscode.EventEmitter<{ walk: CodeWalk; cell: WalkCell; index: number; stepIndex: number; step?: CellStep } | undefined>();
   readonly onCellChanged = this._onCellChanged.event;
 
   resolveWebviewView(
@@ -54,6 +55,15 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
           break;
         case 'prevCell':
           this.prevCell();
+          break;
+        case 'nextStep':
+          this.nextStep();
+          break;
+        case 'prevStep':
+          this.prevStep();
+          break;
+        case 'goToStep':
+          this.goToStepIndex(message.stepIndex);
           break;
         case 'openFrame': {
           const filePath = message.filePath as string;
@@ -92,6 +102,8 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
     logEntry('CodeWalkCellsViewProvider.loadWalk', { walkId: walk.id, cellCount: walk.cells.length });
     this.currentWalk = walk;
     this.currentCellIndex = 0;
+    const firstCell = walk.cells[0];
+    this.currentStepIndex = (firstCell?.steps && firstCell.steps.length > 0) ? 0 : -1;
     this.render();
     this.fireCellChanged();
     logExit('CodeWalkCellsViewProvider.loadWalk');
@@ -120,12 +132,22 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Navigate to the next cell.
+   * Navigate to the next cell (or next sub-step within the current cell).
    */
   nextCell(): void {
     if (!this.currentWalk) return;
+    const cell = this.currentWalk.cells[this.currentCellIndex];
+    // If cell has sub-steps and we haven't finished them, advance step
+    if (cell?.steps && cell.steps.length > 0 && this.currentStepIndex < cell.steps.length - 1) {
+      this.currentStepIndex++;
+      this.render();
+      this.fireCellChanged();
+      return;
+    }
     if (this.currentCellIndex < this.currentWalk.cells.length - 1) {
       this.currentCellIndex++;
+      const nextCell = this.currentWalk.cells[this.currentCellIndex];
+      this.currentStepIndex = (nextCell?.steps && nextCell.steps.length > 0) ? 0 : -1;
       this.render();
       this.fireCellChanged();
     } else {
@@ -134,16 +156,65 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Navigate to the previous cell.
+   * Navigate to the previous cell (or previous sub-step within the current cell).
    */
   prevCell(): void {
     if (!this.currentWalk) return;
+    const cell = this.currentWalk.cells[this.currentCellIndex];
+    // If cell has sub-steps and we're not on the first, go back a step
+    if (cell?.steps && cell.steps.length > 0 && this.currentStepIndex > 0) {
+      this.currentStepIndex--;
+      this.render();
+      this.fireCellChanged();
+      return;
+    }
     if (this.currentCellIndex > 0) {
       this.currentCellIndex--;
+      const prevCell = this.currentWalk.cells[this.currentCellIndex];
+      this.currentStepIndex = (prevCell?.steps && prevCell.steps.length > 0) ? 0 : -1;
       this.render();
       this.fireCellChanged();
     } else {
       vscode.window.showInformationMessage('CodeGraph: Already at the first cell.');
+    }
+  }
+
+  /**
+   * Navigate to the next sub-step (without crossing cell boundary).
+   */
+  nextStep(): void {
+    if (!this.currentWalk) return;
+    const cell = this.currentWalk.cells[this.currentCellIndex];
+    if (cell?.steps && this.currentStepIndex < cell.steps.length - 1) {
+      this.currentStepIndex++;
+      this.render();
+      this.fireCellChanged();
+    }
+  }
+
+  /**
+   * Navigate to the previous sub-step (without crossing cell boundary).
+   */
+  prevStep(): void {
+    if (!this.currentWalk) return;
+    const cell = this.currentWalk.cells[this.currentCellIndex];
+    if (cell?.steps && this.currentStepIndex > 0) {
+      this.currentStepIndex--;
+      this.render();
+      this.fireCellChanged();
+    }
+  }
+
+  /**
+   * Jump to a specific sub-step by index.
+   */
+  goToStepIndex(stepIndex: number): void {
+    if (!this.currentWalk) return;
+    const cell = this.currentWalk.cells[this.currentCellIndex];
+    if (cell?.steps && stepIndex >= 0 && stepIndex < cell.steps.length) {
+      this.currentStepIndex = stepIndex;
+      this.render();
+      this.fireCellChanged();
     }
   }
 
@@ -154,6 +225,8 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
     if (!this.currentWalk) return;
     if (index >= 0 && index < this.currentWalk.cells.length) {
       this.currentCellIndex = index;
+      const cell = this.currentWalk.cells[index];
+      this.currentStepIndex = (cell?.steps && cell.steps.length > 0) ? 0 : -1;
       this.render();
       this.fireCellChanged();
     }
@@ -165,6 +238,7 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
   clear(): void {
     this.currentWalk = undefined;
     this.currentCellIndex = 0;
+    this.currentStepIndex = -1;
     this.render();
     this._onCellChanged.fire(undefined);
   }
@@ -173,7 +247,8 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
     if (this.currentWalk) {
       const cell = this.currentWalk.cells[this.currentCellIndex];
       if (cell) {
-        this._onCellChanged.fire({ walk: this.currentWalk, cell, index: this.currentCellIndex });
+        const step = (cell.steps && this.currentStepIndex >= 0) ? cell.steps[this.currentStepIndex] : undefined;
+        this._onCellChanged.fire({ walk: this.currentWalk, cell, index: this.currentCellIndex, stepIndex: this.currentStepIndex, step });
       }
     }
   }
@@ -186,7 +261,7 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    this.view.webview.html = this.getWalkHtml(this.currentWalk, this.currentCellIndex);
+    this.view.webview.html = this.getWalkHtml(this.currentWalk, this.currentCellIndex, this.currentStepIndex);
   }
 
   private getEmptyHtml(): string {
@@ -206,19 +281,48 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
 </html>`;
   }
 
-  private getWalkHtml(walk: CodeWalk, activeIndex: number): string {
+  private getWalkHtml(walk: CodeWalk, activeIndex: number, stepIndex: number): string {
     const cell = walk.cells[activeIndex];
     if (!cell) return this.getEmptyHtml();
 
     const totalCells = walk.cells.length;
+    const hasSteps = cell.steps && cell.steps.length > 0 && stepIndex >= 0;
 
-    // Build narrative
-    const narrativeHtml = cell.narrative
-      ? `<section class="section">
+    // Build narrative — in step mode, show current step prominently
+    let narrativeHtml = '';
+    if (hasSteps) {
+      const step = cell.steps![stepIndex];
+      narrativeHtml = `<section class="section">
+        <h3>Step ${stepIndex + 1} of ${cell.steps!.length}</h3>
+        <div class="narrative">${escapeHtml(step.description)}</div>
+      </section>`;
+      if (cell.narrative) {
+        narrativeHtml += `<section class="section" style="opacity:0.5">
+          <h3>Full Narrative</h3>
+          <div class="narrative" style="font-size:11px">${escapeHtml(cell.narrative)}</div>
+        </section>`;
+      }
+    } else if (cell.narrative) {
+      narrativeHtml = `<section class="section">
           <h3>Explanation</h3>
           <div class="narrative">${escapeHtml(cell.narrative)}</div>
-        </section>`
-      : '';
+        </section>`;
+    }
+
+    // Build steps bar
+    let stepsBarHtml = '';
+    if (hasSteps) {
+      const dots = cell.steps!.map((_s, i) => {
+        const cls = i === stepIndex ? 'step-dot-active' : (i < stepIndex ? 'step-dot-visited' : 'step-dot');
+        return `<span class="${cls}" data-step="${i}"></span>`;
+      }).join('');
+      stepsBarHtml = `<div class="steps-bar">
+        <button class="step-btn" id="prevStepBtn" ${stepIndex === 0 ? 'disabled' : ''}>◀</button>
+        <span class="step-counter">Step ${stepIndex + 1}/${cell.steps!.length}</span>
+        <button class="step-btn" id="nextStepBtn" ${stepIndex === cell.steps!.length - 1 ? 'disabled' : ''}>▶</button>
+        <div class="step-dots">${dots}</div>
+      </div>`;
+    }
 
     // Build variables
     const variablesHtml = this.renderVariables(cell);
@@ -268,6 +372,7 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
 
   <div class="file-ref">${escapeHtml(cell.code.filePath)}:${cell.code.startLine}-${cell.code.endLine}</div>
 
+  ${stepsBarHtml}
   ${narrativeHtml}
   ${variablesHtml}
   ${callStackHtml}
@@ -287,6 +392,21 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
 
       document.getElementById('nextBtn')?.addEventListener('click', () => {
         vscode.postMessage({ type: 'nextCell' });
+      });
+
+      document.getElementById('prevStepBtn')?.addEventListener('click', () => {
+        vscode.postMessage({ type: 'prevStep' });
+      });
+
+      document.getElementById('nextStepBtn')?.addEventListener('click', () => {
+        vscode.postMessage({ type: 'nextStep' });
+      });
+
+      document.querySelectorAll('.step-dot-active, .step-dot-visited, .step-dot').forEach(el => {
+        el.addEventListener('click', () => {
+          const stepIndex = parseInt(el.getAttribute('data-step') || '0', 10);
+          vscode.postMessage({ type: 'goToStep', stepIndex });
+        });
       });
 
       document.querySelectorAll('.cell-item').forEach(el => {
@@ -842,6 +962,50 @@ export class CodeWalkCellsViewProvider implements vscode.WebviewViewProvider {
       .status-dot-partial { background: var(--yellow); }
       .status-dot-complete { background: var(--green); }
       .status-dot-corrected { background: #e91e63; }
+
+      /* Steps bar */
+      .steps-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        background: var(--code-bg);
+        border-radius: 4px;
+        margin-bottom: 8px;
+      }
+      .step-btn {
+        background: var(--badge-bg);
+        color: var(--badge-fg);
+        border: none;
+        padding: 2px 8px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 10px;
+      }
+      .step-btn:hover:not(:disabled) { opacity: 0.85; }
+      .step-btn:disabled { opacity: 0.3; cursor: default; }
+      .step-counter {
+        font-size: 11px;
+        font-weight: 600;
+        min-width: 60px;
+        text-align: center;
+      }
+      .step-dots {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        margin-left: auto;
+      }
+      .step-dot, .step-dot-active, .step-dot-visited {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .step-dot { background: var(--muted); opacity: 0.3; }
+      .step-dot-visited { background: var(--green); opacity: 0.7; }
+      .step-dot-active { background: var(--blue); opacity: 1; transform: scale(1.3); }
     `;
   }
 }

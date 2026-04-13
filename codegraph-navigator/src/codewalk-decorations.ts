@@ -12,7 +12,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { log, logEntry, logExit, logError } from './logger.js';
-import type { WalkCell, CodeWalk, LineHighlight } from '@codegraph/core';
+import type { WalkCell, CodeWalk, LineHighlight, CellStep } from '@codegraph/core';
 
 // ---------------------------------------------------------------------------
 // Decoration types — one per highlight type
@@ -116,6 +116,21 @@ const otherCellDecorationType = vscode.window.createTextEditorDecorationType({
   },
 });
 
+/** Focused line within a sub-step — strong highlight */
+const focusedLineDecorationType = vscode.window.createTextEditorDecorationType({
+  backgroundColor: 'rgba(86, 156, 214, 0.25)',
+  isWholeLine: true,
+  borderWidth: '0 0 0 3px',
+  borderStyle: 'solid',
+  borderColor: new vscode.ThemeColor('charts.blue'),
+  overviewRulerColor: new vscode.ThemeColor('editorOverviewRuler.findMatchForeground'),
+  overviewRulerLane: vscode.OverviewRulerLane.Center,
+  after: {
+    margin: '0 0 0 1em',
+    color: new vscode.ThemeColor('editorCodeLens.foreground'),
+  },
+});
+
 /** All decoration types for cleanup */
 const allDecorationTypes = [
   cellRangeDecorationType,
@@ -126,6 +141,7 @@ const allDecorationTypes = [
   returnedLineDecorationType,
   skippedLineDecorationType,
   otherCellDecorationType,
+  focusedLineDecorationType,
 ];
 
 /**
@@ -149,13 +165,15 @@ function getDecorationTypeForHighlight(type: LineHighlight['type']): vscode.Text
  * @param cell - The current walk cell to display
  * @param workspaceRoot - The workspace root path
  * @param walk - The full code walk (to highlight other cells in same file)
+ * @param activeStep - The active sub-step (for focused line highlighting)
  */
 export async function openCellInEditor(
   cell: WalkCell,
   workspaceRoot: string | undefined,
-  walk?: CodeWalk
+  walk?: CodeWalk,
+  activeStep?: CellStep
 ): Promise<void> {
-  logEntry('openCellInEditor', { cellId: cell.id, filePath: cell.code.filePath });
+  logEntry('openCellInEditor', { cellId: cell.id, filePath: cell.code.filePath, hasStep: !!activeStep });
 
   const filePath = resolveFilePath(cell.code.filePath, workspaceRoot);
   if (!filePath) {
@@ -190,8 +208,22 @@ export async function openCellInEditor(
     }];
     editor.setDecorations(cellRangeDecorationType, rangeDecorations);
 
-    // 2. Apply per-line highlights from the cell's highlights array
-    if (cell.code.highlights && cell.code.highlights.length > 0) {
+    // 2. Apply per-line highlights or sub-step focus
+    if (activeStep) {
+      // In sub-step mode: show focused line with strong highlight
+      const focusStart = Math.max(0, activeStep.focusLine - 1);
+      const focusEnd = Math.max(0, (activeStep.focusEndLine || activeStep.focusLine) - 1);
+      const focusDecorations: vscode.DecorationOptions[] = [{
+        range: new vscode.Range(focusStart, 0, focusEnd, 999),
+      }];
+      editor.setDecorations(focusedLineDecorationType, focusDecorations);
+
+      // Reveal the focused line
+      editor.revealRange(
+        new vscode.Range(focusStart, 0, focusEnd, 0),
+        vscode.TextEditorRevealType.InCenterIfOutsideViewport
+      );
+    } else if (cell.code.highlights && cell.code.highlights.length > 0) {
       // Group highlights by type
       const byType = new Map<string, vscode.DecorationOptions[]>();
       for (const hl of cell.code.highlights) {

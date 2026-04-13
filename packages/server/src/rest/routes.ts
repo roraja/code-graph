@@ -9,6 +9,8 @@
  */
 
 import { Router, type Request, type Response } from 'express';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve, normalize, relative } from 'node:path';
 import type { ServerContext } from '../context.js';
 
 /**
@@ -394,6 +396,75 @@ export function createRestRouter(ctx: ServerContext): Router {
   });
 
   // ------------------------------------------------------------------
+  // Code Walks
+  // ------------------------------------------------------------------
+
+  /**
+   * GET /api/codewalks — list all code walks from disk.
+   * Reads both v1 single-file and v2 multi-file walk directories.
+   * Returns walk metadata (id, name, description, cellCount, tags, dates).
+   */
+  router.get('/api/codewalks', (_req: Request, res: Response) => {
+    try {
+      const walks = ctx.codeWalkFileReader.listCodeWalks();
+      // Return summary (no full cell data) for the list view
+      const summaries = walks.map(w => ({
+        id: w.id,
+        name: w.name,
+        description: w.description,
+        scenarioId: w.scenarioId,
+        cellCount: w.cells.length,
+        tags: w.meta.tags,
+        createdAt: w.meta.createdAt,
+        updatedAt: w.meta.updatedAt,
+        entryPoint: w.meta.entryPoint,
+        contributors: w.meta.contributors.map(c => c.tool),
+      }));
+      res.json(summaries);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * GET /api/codewalks/:id — get a full code walk by ID, including all cells.
+   */
+  router.get('/api/codewalks/:id', (req: Request, res: Response) => {
+    try {
+      const walk = ctx.codeWalkFileReader.getCodeWalk(req.params.id);
+      if (!walk) {
+        res.status(404).json({ error: 'Code walk not found' });
+        return;
+      }
+      // Return the full walk in v1 format (compatible with the HTML viewer)
+      res.json({ _format: 'codegraph-codewalk-v1', walk });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  /**
+   * GET /api/codewalks/:id/cells/:index — get a single cell from a walk.
+   */
+  router.get('/api/codewalks/:id/cells/:index', (req: Request, res: Response) => {
+    try {
+      const cellIndex = parseInt(req.params.index, 10);
+      if (isNaN(cellIndex) || cellIndex < 0) {
+        res.status(400).json({ error: 'Invalid cell index' });
+        return;
+      }
+      const cell = ctx.codeWalkFileReader.getCell(req.params.id, cellIndex);
+      if (!cell) {
+        res.status(404).json({ error: 'Cell not found' });
+        return;
+      }
+      res.json(cell);
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  // ------------------------------------------------------------------
   // Graph (for visualization)
   // ------------------------------------------------------------------
 
@@ -464,6 +535,42 @@ export function createRestRouter(ctx: ServerContext): Router {
         nodes: Array.from(nodeMap.values()),
         edges,
       });
+    } catch (err) {
+      res.status(500).json({ error: errorMessage(err) });
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // Source File Reading (for full-file codewalk viewer)
+  // ------------------------------------------------------------------
+
+  /**
+   * GET /api/file?path=<relative-path> — read a source file from the project.
+   * Returns the file content as JSON. Path must be within the project root.
+   */
+  router.get('/api/file', (req: Request, res: Response) => {
+    try {
+      const filePath = req.query.path as string;
+      if (!filePath) { res.status(400).json({ error: 'Missing "path" query parameter' }); return; }
+
+      const projectRoot = ctx.config.project.rootDirs?.[0]
+        ? resolve(process.cwd(), '..')
+        : process.cwd();
+
+      const absPath = resolve(projectRoot, filePath);
+      const rel = relative(projectRoot, absPath);
+      if (rel.startsWith('..') || normalize(rel).startsWith('..')) {
+        res.status(403).json({ error: 'Path is outside project root' });
+        return;
+      }
+
+      if (!existsSync(absPath)) {
+        res.status(404).json({ error: 'File not found', path: filePath });
+        return;
+      }
+
+      const content = readFileSync(absPath, 'utf-8');
+      res.json({ path: filePath, content, lines: content.split('\n').length });
     } catch (err) {
       res.status(500).json({ error: errorMessage(err) });
     }

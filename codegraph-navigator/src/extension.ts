@@ -789,7 +789,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Sync cell changes from webview to editor
   codeWalkCellsViewProvider.onCellChanged((data) => {
     if (data) {
-      openCellInEditor(data.cell, workspaceRoot, data.walk);
+      openCellInEditor(data.cell, workspaceRoot, data.walk, data.step);
     }
   });
 

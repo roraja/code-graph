@@ -1,0 +1,82 @@
+{
+  "_format": "codegraph-cell-v1",
+  "walkId": "image-processor-process",
+  "cell": {
+    "id": "cell-0",
+    "index": 0,
+    "type": "entry",
+    "code": {
+      "filePath": "src/processors.ts",
+      "startLine": 3,
+      "endLine": 21,
+      "text": "export class ImageProcessor implements IFileProcessor {\n  private supportedTypes = ['image/png', 'image/jpeg', 'image/gif'];\n\n  async process(file: FileData): Promise<ProcessResult> {\n    if (!this.supports(file.mimeType)) {\n      return {\n        success: false,\n        message: `Unsupported image type: ${file.mimeType}`,\n        processedBytes: 0,\n      };\n    }\n\n    const processedBytes = this.resizeImage(file);\n    return {\n      success: true,\n      message: `Processed image ${file.fileName}`,\n      processedBytes,\n    };\n  }",
+      "highlights": [
+        { "line": 6, "type": "executed", "annotation": "Entry: process() called" },
+        { "line": 7, "type": "branched", "annotation": "Check MIME type support" },
+        { "line": 15, "type": "called", "annotation": "Delegate to resizeImage()" },
+        { "line": 16, "type": "returned", "annotation": "Return success result" }
+      ]
+    },
+    "narrative": "The process() method is the main entry point for image processing. It receives a FileData object, validates the MIME type, resizes the image, and returns a ProcessResult. In this scenario we process a valid JPEG file, so the supports() check passes and we proceed to resizeImage().",
+    "steps": [
+      {
+        "description": "The `process()` method receives a `FileData` object containing the file's metadata and content. This is the entry point defined by the `IFileProcessor` interface.",
+        "focusLine": 6
+      },
+      {
+        "description": "Check if the file's MIME type is supported by calling `this.supports()`. For our JPEG file (`image/jpeg`), this returns `true`, so we skip the early-return error block.",
+        "focusLine": 7
+      },
+      {
+        "description": "This early-return block would execute for unsupported types (e.g., `image/webp`). Since our file is a supported JPEG, this block is **skipped**.",
+        "focusLine": 8,
+        "focusEndLine": 12
+      },
+      {
+        "description": "Call `this.resizeImage(file)` to perform the actual image processing. The return value is the number of processed bytes.",
+        "focusLine": 15
+      },
+      {
+        "description": "Return a success `ProcessResult` with a descriptive message and the byte count from `resizeImage()`.",
+        "focusLine": 16,
+        "focusEndLine": 19
+      }
+    ],
+    "state": {
+      "scopes": [
+        {
+          "name": "parameters",
+          "variables": {
+            "file": {
+              "value": "{ fileName: 'photo.jpg', fileSize: 2097152, mimeType: 'image/jpeg', content: <Buffer ...> }",
+              "type": "FileData",
+              "changed": false,
+              "action": "read",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T12:00:00Z", "confidence": 0.95 },
+              "rationale": "A 2MB JPEG file — realistic for a photo upload"
+            }
+          }
+        },
+        {
+          "name": "this",
+          "variables": {
+            "supportedTypes": {
+              "value": "['image/png', 'image/jpeg', 'image/gif']",
+              "type": "string[]",
+              "changed": false,
+              "action": "read",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T12:00:00Z", "confidence": 1.0 }
+            }
+          }
+        }
+      ]
+    },
+    "stackDepth": 0,
+    "callStack": [
+      { "functionName": "ImageProcessor.process", "filePath": "src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" }
+    ],
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T12:00:00Z", "confidence": 0.95 },
+    "confidence": 0.95,
+    "status": "complete"
+  }
+}

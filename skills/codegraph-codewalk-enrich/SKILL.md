@@ -130,3 +130,4 @@ Update `walk.meta.updatedAt`.
 - **Match the scenario context** — variable values should be consistent across cells (if email is "user@example.com" in cell 0, it should be the same in cell 3)
 - **Track provenance** — every value you add should have `source.tool: "ai:claude"` and a reasonable confidence
 - **Static analyzers are optional** — read code directly, but leverage clangd/IntelliSense if available for type information
+- **Add sub-steps to dense cells** — if a cell has 3+ conceptually distinct lines, add a `steps` array. Each step has `description` (what this line does) and `focusLine` (1-based line number to highlight). The viewer shows one step at a time for clarity. See the `codewalk-populate` skill for the `CellStep` structure.

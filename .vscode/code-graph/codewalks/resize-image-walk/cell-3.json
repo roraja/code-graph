@@ -1,0 +1,51 @@
+{
+  "_format": "codegraph-cell-v1",
+  "walkId": "resize-image-walk",
+  "cell": {
+    "id": "cell-3",
+    "index": 3,
+    "type": "branch",
+    "code": {
+      "filePath": "test/fixtures/sample-project/src/processors.ts",
+      "startLine": 7,
+      "endLine": 13,
+      "text": "    if (!this.supports(file.mimeType)) {\n      return {\n        success: false,\n        message: `Unsupported image type: ${file.mimeType}`,\n        processedBytes: 0,\n      };\n    }",
+      "highlights": [
+        { "line": 7, "type": "branched", "annotation": "Condition: !true === false → skip error return" },
+        { "line": 8, "type": "skipped" },
+        { "line": 9, "type": "skipped" },
+        { "line": 10, "type": "skipped" },
+        { "line": 11, "type": "skipped" },
+        { "line": 12, "type": "skipped" },
+        { "line": 13, "type": "skipped" }
+      ]
+    },
+    "narrative": "The guard clause evaluates !this.supports(\"image/jpeg\") which is !true === false. The early-return block is skipped entirely, and execution continues to the resizeImage() call on line 15.",
+    "state": {
+      "scopes": [
+        {
+          "name": "local",
+          "variables": {
+            "!this.supports(file.mimeType)": {
+              "value": "false",
+              "type": "boolean",
+              "changed": true,
+              "action": "created",
+              "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+              "rationale": "supports() returned true, so negation is false"
+            }
+          }
+        }
+      ],
+      "changes": ["branch condition: false (skip error path)"]
+    },
+    "stackDepth": 0,
+    "parentCellId": "cell-0",
+    "callStack": [
+      { "functionName": "ImageProcessor.process", "filePath": "test/fixtures/sample-project/src/processors.ts", "line": 6, "depth": 0, "cellId": "cell-0" }
+    ],
+    "source": { "tool": "ai:claude", "timestamp": "2026-04-12T00:00:00Z", "confidence": 1.0 },
+    "confidence": 1.0,
+    "status": "complete"
+  }
+}
