@@ -2,7 +2,7 @@
   "name": "codegraph-navigator",
   "displayName": "CodeGraph Navigator",
   "description": "Explore CodeGraph scenarios, walk through traced execution paths, browse code walks as notebook-style cells, and inspect functions — all from the VS Code sidebar.",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "publisher": "codegraph",
   "repository": {
     "type": "git",
@@ -23,11 +23,6 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "codegraph-navigator",
-          "title": "CodeGraph v0.6.0",
-          "icon": "media/codegraph-icon.svg"
-        },
-        {
           "id": "codegraph-codewalk",
           "title": "Code Walk",
           "icon": "media/codegraph-icon.svg"
@@ -35,30 +30,6 @@
       ]
     },
     "views": {
-      "codegraph-navigator": [
-        {
-          "id": "codegraph.scenarios",
-          "name": "Scenarios"
-        },
-        {
-          "id": "codegraph.stepWalker",
-          "name": "Step Walker"
-        },
-        {
-          "id": "codegraph.stepDetail",
-          "name": "Step Detail",
-          "type": "webview"
-        },
-        {
-          "id": "codegraph.callStack",
-          "name": "Call Stack",
-          "type": "webview"
-        },
-        {
-          "id": "codegraph.functions",
-          "name": "Functions"
-        }
-      ],
       "codegraph-codewalk": [
         {
           "id": "codegraph.codeWalkCells",
