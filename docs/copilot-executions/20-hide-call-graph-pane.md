@@ -109,3 +109,37 @@ Follow-ups the user may want later (not done now):
 
 ### Result
 After re-installing the VSIX, only the **Code Walk** activity-bar icon remains; the old CodeGraph activity bar (Scenarios/Step Walker/etc.) is gone from the sidebar.
+
+---
+
+## Follow-up turn 2: Bug fix for v0.6.1 — codewalk window stopped working
+
+**Prompt**: "The fix didnt work. The container got removed but the codewalk stopped working, i started getting errors"
+
+### Root cause
+`codegraph-navigator/src/extension.ts` line 66 called `vscode.window.createTreeView('codegraph.scenarios', ...)`. Unlike `registerTreeDataProvider` and `registerWebviewViewProvider` (which are silent no-ops when the view ID is missing), **`createTreeView` throws synchronously** when the view ID isn't declared in `package.json`. After v0.6.1 removed the `codegraph.scenarios` view from the manifest, this throw aborted `activate()` before the `CodeWalkCellsViewProvider` on line 80 was ever registered — so the Code Walk webview never appeared and the extension reported activation failure.
+
+A secondary issue: the `codegraph.showViewer` command tried to focus `workbench.view.extension.codegraph-navigator`, an activity-bar container that no longer exists.
+
+### Fix (UI-only scope preserved)
+`codegraph-navigator/src/extension.ts`:
+1. Introduced a `safeRegister(label, fn)` helper that wraps each provider registration in try/catch and logs a warning instead of aborting activation.
+2. Re-wrote the six provider registrations (scenarios, stepWalker, stepDetail, callStack, functions, codeWalkCells) to use `safeRegister`. The first five may no-op or throw (silently caught), but `codegraph.codeWalkCells` is guaranteed to register because earlier failures no longer short-circuit activation.
+3. Hoisted `scenariosTreeView` to a `let` declared above the registration block (typed `vscode.TreeView<unknown> | undefined`) so the `codegraph.filterScenarios` command can guard its usage with an `if (scenariosTreeView)` check instead of failing to compile.
+4. Updated `codegraph.showViewer` to focus `workbench.view.extension.codegraph-codewalk` (the surviving container) instead of the removed `codegraph-navigator` container.
+
+### Verification
+- `npx tsc -p tsconfig.json` in `codegraph-navigator` → no errors after the hoist + guard
+- `npm run build --workspace=packages/core` → green
+- `npm run build --workspace=codegraph-navigator` → green (esbuild 15.4 MB bundle as before)
+- `npx @vscode/vsce package --no-dependencies` → packaged `codegraph-navigator-0.6.2.vsix` (2.48 MB, 10 files)
+
+### Version
+Bumped `codegraph-navigator` to **0.6.2** (patch, follow-up bug fix for v0.6.1). Root `package-lock.json` updated via `npm install --package-lock-only`.
+
+### Files changed in this follow-up
+| File | Action | Description |
+|------|--------|-------------|
+| `codegraph-navigator/src/extension.ts` | Modified | Added `safeRegister` helper; wrapped all 6 provider registrations; hoisted `scenariosTreeView` to optional `let` + guarded its usage in `codegraph.filterScenarios`; updated `codegraph.showViewer` to target the codewalk container |
+| `codegraph-navigator/package.json` | Modified | Version 0.6.1 → 0.6.2 |
+| `package-lock.json` | Modified | Workspace version 0.6.1 → 0.6.2 |

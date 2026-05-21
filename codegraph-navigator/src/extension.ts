@@ -62,35 +62,71 @@ export function activate(context: vscode.ExtensionContext): void {
   const functionsProvider = new FunctionsProvider();
   const codeWalkCellsViewProvider = new CodeWalkCellsViewProvider();
 
-  // Register tree data providers
-  const scenariosTreeView = vscode.window.createTreeView('codegraph.scenarios', {
-    treeDataProvider: scenariosProvider,
+  // Holds the Scenarios tree view reference if it was successfully created.
+  // Undefined when the view is hidden from the manifest (post-0.6.1).
+  let scenariosTreeView: vscode.TreeView<unknown> | undefined;
+
+  // Register tree/webview providers.
+  //
+  // The "CodeGraph v0.6.0" activity-bar container and its 5 views (scenarios,
+  // stepWalker, stepDetail, callStack, functions) were removed from package.json
+  // in 0.6.1 to leave only the "Code Walk" container visible. Their registration
+  // calls below are kept so the existing commands continue to function if the
+  // views are re-introduced, but they're wrapped in try/catch because
+  // `createTreeView` throws synchronously when the view ID isn't declared in
+  // the manifest — and that throw would otherwise abort activation before the
+  // Code Walk Cells webview provider is registered.
+  const safeRegister = (label: string, fn: () => vscode.Disposable): void => {
+    try {
+      context.subscriptions.push(fn());
+    } catch (err) {
+      log('warn', `Skipping registration for hidden view: ${label}`, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  safeRegister('codegraph.scenarios (tree view)', () => {
+    const view = vscode.window.createTreeView('codegraph.scenarios', {
+      treeDataProvider: scenariosProvider,
+    });
+    view.description = `v${context.extension.packageJSON.version}`;
+    scenariosTreeView = view;
+    return view;
   });
-  scenariosTreeView.description = `v${context.extension.packageJSON.version}`;
-  context.subscriptions.push(
-    scenariosTreeView,
-    vscode.window.registerTreeDataProvider('codegraph.stepWalker', stepWalkerProvider),
+  safeRegister('codegraph.stepWalker', () =>
+    vscode.window.registerTreeDataProvider('codegraph.stepWalker', stepWalkerProvider)
+  );
+  safeRegister('codegraph.stepDetail', () =>
     vscode.window.registerWebviewViewProvider(StepDetailViewProvider.viewType, stepDetailViewProvider, {
       webviewOptions: { retainContextWhenHidden: true },
-    }),
+    })
+  );
+  safeRegister('codegraph.callStack', () =>
     vscode.window.registerWebviewViewProvider(CallStackViewProvider.viewType, callStackViewProvider, {
       webviewOptions: { retainContextWhenHidden: true },
-    }),
-    vscode.window.registerTreeDataProvider('codegraph.functions', functionsProvider),
+    })
+  );
+  safeRegister('codegraph.functions', () =>
+    vscode.window.registerTreeDataProvider('codegraph.functions', functionsProvider)
+  );
+  safeRegister('codegraph.codeWalkCells', () =>
     vscode.window.registerWebviewViewProvider(CodeWalkCellsViewProvider.viewType, codeWalkCellsViewProvider, {
       webviewOptions: { retainContextWhenHidden: true },
-    }),
+    })
   );
 
   // --- Commands ---
 
-  // Show Code Graph Viewer — focus the sidebar
+  // Show Code Graph Viewer — focus the sidebar.
+  // Since the "codegraph-navigator" activity-bar container was removed in 0.6.1,
+  // this command now focuses the "Code Walk" container instead.
   log('debug', 'Registering command: codegraph.showViewer');
   context.subscriptions.push(
     vscode.commands.registerCommand('codegraph.showViewer', async () => {
       logEntry('cmd:showViewer');
       try {
-        await vscode.commands.executeCommand('workbench.view.extension.codegraph-navigator');
+        await vscode.commands.executeCommand('workbench.view.extension.codegraph-codewalk');
         logExit('cmd:showViewer');
       } catch (err) {
         logError('cmd:showViewer', err);
@@ -138,10 +174,12 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         scenariosProvider.setFilter(query || undefined);
         // Update the tree view description to show active filter
-        if (query) {
-          scenariosTreeView.description = `Filter: ${query}`;
-        } else {
-          scenariosTreeView.description = `v${context.extension.packageJSON.version}`;
+        if (scenariosTreeView) {
+          if (query) {
+            scenariosTreeView.description = `Filter: ${query}`;
+          } else {
+            scenariosTreeView.description = `v${context.extension.packageJSON.version}`;
+          }
         }
         logExit('cmd:filterScenarios', { query });
       } catch (err) {

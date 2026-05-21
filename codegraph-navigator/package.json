@@ -2,7 +2,7 @@
   "name": "codegraph-navigator",
   "displayName": "CodeGraph Navigator",
   "description": "Explore CodeGraph scenarios, walk through traced execution paths, browse code walks as notebook-style cells, and inspect functions — all from the VS Code sidebar.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "publisher": "codegraph",
   "repository": {
     "type": "git",
